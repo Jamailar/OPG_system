@@ -1,9 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
-import { json, text, urlencoded } from 'express';
+import { existsSync, readFileSync } from 'fs';
+import { basename, extname, resolve } from 'path';
+import { json, static as expressStatic, text, urlencoded } from 'express';
 import { ConfigType } from '@nestjs/config';
 import { PrismaClient } from '@prisma/client';
 import { AppModule } from './app.module';
@@ -29,10 +29,101 @@ function resolvePackageVersion(): string {
   return 'unknown';
 }
 
+interface BundledWebConfig {
+  distPath: string;
+  indexPath: string;
+}
+
+function isEnabled(value: string | undefined): boolean {
+  return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
+function configureBundledWebAssets(app: any): BundledWebConfig | null {
+  if (!isEnabled(process.env.OPG_SERVE_WEB)) {
+    return null;
+  }
+
+  const distPath = resolve(process.env.OPG_WEB_DIST || resolve(process.cwd(), 'public'));
+  const indexPath = resolve(distPath, 'index.html');
+
+  if (!existsSync(indexPath)) {
+    console.warn(`[BundledWeb] OPG_SERVE_WEB is enabled but ${indexPath} does not exist.`);
+    return null;
+  }
+
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.use(
+    expressStatic(distPath, {
+      index: false,
+      setHeaders: (response: any, filePath: string) => {
+        const fileName = basename(filePath);
+        if (fileName === 'index.html' || fileName === 'env.js') {
+          response.setHeader('Cache-Control', 'no-store');
+          return;
+        }
+        if (filePath.includes('/assets/')) {
+          response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+      },
+    }),
+  );
+
+  console.log(`[BundledWeb] serving static assets from ${distPath}`);
+  return { distPath, indexPath };
+}
+
+function shouldServeBundledSpa(request: any): boolean {
+  const method = String(request.method || '').toUpperCase();
+  if (method !== 'GET' && method !== 'HEAD') {
+    return false;
+  }
+
+  const requestPath = String(request.path || request.url || '/').split('?')[0] || '/';
+  const normalized = requestPath.toLowerCase();
+  const accept = String(request.headers?.accept || '');
+  if (accept && !accept.includes('text/html') && !accept.includes('*/*')) {
+    return false;
+  }
+
+  if (
+    normalized === '/runtime-config' ||
+    normalized === '/health' ||
+    normalized === '/healthz' ||
+    normalized.startsWith('/api/') ||
+    normalized === '/api' ||
+    normalized.startsWith('/v1/') ||
+    normalized === '/v1' ||
+    normalized.startsWith('/v1beta/') ||
+    normalized === '/v1beta' ||
+    /^\/[^/]+\/v1(?:\/|$)/.test(normalized) ||
+    /^\/[^/]+\/v1beta(?:\/|$)/.test(normalized)
+  ) {
+    return false;
+  }
+
+  return !extname(normalized);
+}
+
+function registerBundledWebFallback(app: any, bundledWeb: BundledWebConfig | null): void {
+  if (!bundledWeb) {
+    return;
+  }
+
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.get('*', (request: any, response: any, next: any) => {
+    if (!shouldServeBundledSpa(request)) {
+      next();
+      return;
+    }
+    response.sendFile(bundledWeb.indexPath);
+  });
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const appVersion = resolvePackageVersion();
   app.enableShutdownHooks();
+  const bundledWeb = configureBundledWebAssets(app);
   const appConfig = app.get<ConfigType<typeof configuration>>(configuration.KEY);
   const runtimeSettings = app.get(RuntimeSettingsService, { strict: false });
   const dbCorsOrigins = await runtimeSettings.getConfiguredCorsOrigins().catch((error: any) => {
@@ -119,8 +210,9 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  // Listen on port 3000
   const port = appConfig.port || 3000;
+  await app.init();
+  registerBundledWebFallback(app, bundledWeb);
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);
   console.log(`Swagger docs available at: http://localhost:${port}/api/docs`);
