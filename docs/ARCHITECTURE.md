@@ -168,7 +168,9 @@ Infrastructure
 实现：
 
 - 必须用现成库：OpenAI、Anthropic、Google、DashScope 等官方 SDK 或稳定 HTTP client。
-- 自研 provider adapter、usage ledger、积分流水、任务状态、错误码。
+- 自研 provider adapter、路由调度、key 级健康状态、usage ledger、积分流水、任务状态、错误码。
+- 请求链路必须持久化关键事件：route selected、upstream response/error、usage recorded、points charged。日志只做辅助排查，不能作为审计真值。
+- provider/source/model/app route 配置变更必须写审计事件，审计表只保存脱敏元数据和 before/after hash，不保存密钥明文。
 - 前端不得直接绑定第三方 AI payload。
 
 ### 8. Video

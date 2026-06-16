@@ -127,7 +127,7 @@ export class FeedbackAdminApiController {
   private async resolveActorUserId(appId: string, body: Record<string, unknown>): Promise<string> {
     const integrationSettings = (await this.runtimeSettingsService.getIntegrationSettings().catch(() => ({}))) as Record<string, unknown>;
     const configuredActor = String(integrationSettings.feedback_admin_actor_user_id || '').trim();
-    const requestedActor = String(body.actor_user_id || configuredActor || process.env.FEEDBACK_ADMIN_API_ACTOR_USER_ID || '').trim();
+    const requestedActor = String(body.actor_user_id || configuredActor || '').trim();
     if (requestedActor) {
       const rows = (await this.prisma.$queryRawUnsafe(
         `SELECT id
