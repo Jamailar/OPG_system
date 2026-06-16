@@ -17,8 +17,12 @@ fi
 echo "Checking database migration status..."
 "$PRISMA_CLI" migrate status --schema "$SCHEMA_PATH" || true
 
-echo "Applying pending database migrations..."
-"$PRISMA_CLI" migrate deploy --schema "$SCHEMA_PATH"
+if [ "${OPG_RUN_MIGRATIONS:-true}" = "false" ] || [ "${OPG_RUN_MIGRATIONS:-true}" = "0" ]; then
+  echo "Skipping database migrations because OPG_RUN_MIGRATIONS=${OPG_RUN_MIGRATIONS}."
+else
+  echo "Applying pending database migrations..."
+  "$PRISMA_CLI" migrate deploy --schema "$SCHEMA_PATH"
+fi
 
 echo "Starting opg-gateway..."
 exec node dist/main
