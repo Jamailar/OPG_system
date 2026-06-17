@@ -19,6 +19,7 @@ import PlatformSmsServicesPage from '@/pages/platform/PlatformSmsServicesPage';
 import PlatformEmailServicePage from '@/pages/platform/PlatformEmailServicePage';
 import PlatformAgentsPage from '@/pages/platform/PlatformAgentsPage';
 import PlatformRuntimeSettingsPage from '@/pages/platform/PlatformRuntimeSettingsPage';
+import PlatformObservabilityPage from '@/pages/platform/PlatformObservabilityPage';
 import PlatformLayout from '@/components/PlatformLayout';
 import { applyRuntimeContext, runtimeContext } from '@/lib/runtime-context';
 import '@/styles/globals.css';
@@ -184,6 +185,15 @@ function App() {
           element={
             <PlatformProtectedRoute>
               <PlatformEmailServicePage />
+            </PlatformProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/platform-admin/observability"
+          element={
+            <PlatformProtectedRoute>
+              <PlatformObservabilityPage />
             </PlatformProtectedRoute>
           }
         />

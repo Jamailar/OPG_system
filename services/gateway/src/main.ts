@@ -11,6 +11,7 @@ import configuration from './config/configuration';
 import { PRISMA_CLIENT } from './config/database.module';
 import { createAppSlugAliasMiddleware } from './common/middleware/app-slug-alias.middleware';
 import { RuntimeSettingsService } from './modules/runtime-settings/runtime-settings.service';
+import { PlatformObservabilityService } from './modules/observability/platform-observability.service';
 
 function resolvePackageVersion(): string {
   const candidatePaths = [resolve(process.cwd(), 'package.json'), resolve(__dirname, '..', 'package.json')];
@@ -89,6 +90,7 @@ function shouldServeBundledSpa(request: any): boolean {
     normalized === '/runtime-config' ||
     normalized === '/health' ||
     normalized === '/healthz' ||
+    normalized === '/readyz' ||
     normalized.startsWith('/api/') ||
     normalized === '/api' ||
     normalized.startsWith('/v1/') ||
@@ -192,6 +194,32 @@ async function bootstrap() {
   app.getHttpAdapter().get('/health', healthHandler);
   app.getHttpAdapter().get('/healthz', healthHandler);
   app.getHttpAdapter().get('/api/v1/health', healthHandler);
+
+  const prisma = app.get<PrismaClient>(PRISMA_CLIENT);
+  const observability = app.get(PlatformObservabilityService, { strict: false });
+  const readinessHandler = async (_request: any, response: any) => {
+    const checks: Record<string, { ok: boolean; message?: string }> = {};
+    try {
+      await prisma.$queryRawUnsafe('SELECT 1 AS ok');
+      checks.database = { ok: true };
+    } catch (error: any) {
+      checks.database = { ok: false, message: String(error?.message || error).slice(0, 500) };
+    }
+
+    try {
+      checks.observability = { ok: await observability.isSchemaReady() };
+    } catch (error: any) {
+      checks.observability = { ok: false, message: String(error?.message || error).slice(0, 500) };
+    }
+
+    const ok = Object.values(checks).every((item) => item.ok);
+    response.status(ok ? 200 : 503).json({
+      ok,
+      checks,
+    });
+  };
+  app.getHttpAdapter().get('/readyz', readinessHandler);
+  app.getHttpAdapter().get('/api/v1/readyz', readinessHandler);
 
   // Enable validation
   app.useGlobalPipes(

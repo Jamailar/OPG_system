@@ -24,8 +24,8 @@
 │   ├── usage-ledger.md      # 用量、成本和账本事件
 │   └── runtime-settings.md  # 极简环境变量和管理员配置
 ├── packages/
-│   ├── sdk/                 # @opg/sdk 应用运行时客户端
-│   └── cli/                 # @opg/cli 初始化与 Codex MCP server
+│   ├── sdk/                 # opg-sdk 应用运行时客户端
+│   └── cli/                 # opg-dev-cli 初始化与 Codex MCP server
 ├── LICENSE
 ├── package.json
 └── README.md
@@ -57,8 +57,16 @@ npm run cli:build
 用户项目接入：
 
 ```bash
-npx -y @opg/cli init --base-url https://api.example.com --app your-app
-npx -y @opg/cli codex install --base-url https://api.example.com --app your-app
+npm install opg-sdk
+npx -y opg-dev-cli init --base-url https://api.example.com --app your-app
+npx -y opg-dev-cli codex install --base-url https://api.example.com --app your-app
+```
+
+SDK 数据库能力通过后端受控代理执行，不暴露 `DATABASE_URL`。AI agent 只能操作当前 app 命名空间内的表，例如 `app_your_app__customers`，写操作默认 dry-run，真正执行需要 `confirm=apply:<app-slug>`。
+后端部署后，用下面的命令验收 SDK 数据库链路：
+
+```bash
+OPG_BASE_URL=https://api.example.com OPG_APP_SLUG=your-app OPG_API_KEY=rbx_xxx npm run sdk:db:smoke
 ```
 
 真实密钥不进入仓库。需要环境变量时，从各子项目的 `.env.example` 复制成本地 `.env`。

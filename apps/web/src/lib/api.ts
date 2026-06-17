@@ -1755,6 +1755,94 @@ export interface PlatformAiGatewayRuntime {
   };
 }
 
+export interface PlatformObservabilityRuntimeModule {
+  module: string;
+  events_count: string | number;
+  failures_count: string | number;
+  slow_count: string | number;
+  avg_latency_ms?: string | number | null;
+  last_event_at?: string | null;
+}
+
+export interface PlatformObservabilityRequestEvent {
+  id: string;
+  request_id?: string | null;
+  trace_id?: string | null;
+  app_id?: string | null;
+  app_slug?: string | null;
+  actor_user_id?: string | null;
+  module: string;
+  operation: string;
+  resource_type?: string | null;
+  resource_id?: string | null;
+  stage?: string | null;
+  method?: string | null;
+  request_path?: string | null;
+  success?: boolean | null;
+  status_code?: number | null;
+  error_category?: string | null;
+  error_message?: string | null;
+  latency_ms?: number | null;
+  metadata_json?: Record<string, unknown>;
+  created_at?: string;
+}
+
+export interface PlatformObservabilityAuditEvent {
+  id: string;
+  request_id?: string | null;
+  actor_user_id?: string | null;
+  app_id?: string | null;
+  app_slug?: string | null;
+  module: string;
+  action: string;
+  resource_type: string;
+  resource_id?: string | null;
+  before_hash?: string | null;
+  after_hash?: string | null;
+  metadata_json?: Record<string, unknown>;
+  created_at?: string;
+}
+
+export interface PlatformObservabilityRuntime {
+  schema_ready: boolean;
+  tables?: Array<{
+    name: string;
+    ready: boolean;
+    estimated_rows: number;
+    latest_created_at?: string | null;
+  }>;
+  retention?: {
+    request_event_days: number;
+    audit_event_days: number;
+    batch_size: number;
+  };
+  modules: PlatformObservabilityRuntimeModule[];
+  recent_errors: PlatformObservabilityRequestEvent[];
+}
+
+export interface PlatformObservabilityEventsResponse<T> {
+  items: T[];
+  page: number;
+  page_size: number;
+  has_more: boolean;
+}
+
+export interface PlatformObservabilityEventsQuery {
+  app_id?: string;
+  actor_user_id?: string;
+  request_id?: string;
+  module?: string;
+  operation?: string;
+  action?: string;
+  resource_type?: string;
+  resource_id?: string;
+  success?: string;
+  status_min?: string;
+  days?: string;
+  page?: string | number;
+  page_size?: string | number;
+}
+
 export interface PlatformAiModelConnectivityTestResult {
   ok: boolean;
   status_code: number | null;
@@ -2101,6 +2189,13 @@ export interface PlatformAppAiModelRouteItem {
     name: string;
     provider_type: string;
     is_active: boolean;
+  };
+  app_visibility: {
+    is_visible: boolean;
+    is_explicit: boolean;
+    global_is_visible: boolean;
+    effective_is_visible: boolean;
+    updated_at?: string | null;
   };
   override: {
     route_id: string;
@@ -3394,6 +3489,21 @@ export const platformApi = {
     return response.data;
   },
 
+  getPlatformObservabilityRuntime: async () => {
+    const response = await apiClient.getClient().get('/platform-admin/observability/runtime');
+    return response.data;
+  },
+
+  listPlatformRequestEvents: async (params?: PlatformObservabilityEventsQuery) => {
+    const response = await apiClient.getClient().get('/platform-admin/observability/request-events', { params });
+    return response.data;
+  },
+
+  listPlatformAuditEvents: async (params?: PlatformObservabilityEventsQuery) => {
+    const response = await apiClient.getClient().get('/platform-admin/observability/audit-events', { params });
+    return response.data;
+  },
+
   createGlobalAiSource: async (
     payload: {
       name: string;
@@ -3689,6 +3799,14 @@ export const platformApi = {
 
   deleteAppAiModelRoute: async (appId: string, modelId: string) => {
     const response = await apiClient.getClient().delete(`/platform-admin/apps/${appId}/ai/model-routes/${modelId}`);
+    return response.data;
+  },
+
+  updateAppAiModelVisibility: async (appId: string, modelId: string, payload: { is_visible: boolean }) => {
+    const response = await apiClient.getClient().put(
+      `/platform-admin/apps/${appId}/ai/model-visibility/${modelId}`,
+      payload
+    );
     return response.data;
   },
 

@@ -10,6 +10,7 @@ import { PlatformAdminService } from './platform-admin.service';
 import { PlatformAdminAiDebugJwtAuthGuard } from './guards/platform-admin-ai-debug-jwt-auth.guard';
 import { RuntimeSettingsService } from '../runtime-settings/runtime-settings.service';
 import { AiGatewayObservabilityService } from '../ai-chat/ai-gateway-observability.service';
+import { PlatformObservabilityService } from '../observability/platform-observability.service';
 
 @ApiTags('PlatformAdmin')
 @Controller(tenantControllerPaths('platform-admin', true))
@@ -23,6 +24,7 @@ export class PlatformAdminController {
     private readonly outboundProxyService: OutboundProxyService,
     private readonly runtimeSettingsService: RuntimeSettingsService,
     private readonly aiGatewayObservabilityService: AiGatewayObservabilityService,
+    private readonly platformObservabilityService: PlatformObservabilityService,
   ) {}
 
   @Get('apps')
@@ -41,6 +43,70 @@ export class PlatformAdminController {
   @ApiOperation({ summary: '更新平台运行时设置' })
   async updateRuntimeSettings(@Req() req: any, @Body() body: any) {
     return this.runtimeSettingsService.updateAdminRuntimeSettings(req.user.id, body || {});
+  }
+
+  @Get('observability/runtime')
+  @ApiOperation({ summary: '平台运行观测摘要' })
+  async getPlatformObservabilityRuntime() {
+    return this.platformObservabilityService.getRuntimeSummary();
+  }
+
+  @Get('observability/request-events')
+  @ApiOperation({ summary: '平台请求事件' })
+  async listPlatformRequestEvents(
+    @Query('app_id') appId?: string,
+    @Query('actor_user_id') actorUserId?: string,
+    @Query('request_id') requestId?: string,
+    @Query('module') module?: string,
+    @Query('operation') operation?: string,
+    @Query('resource_type') resourceType?: string,
+    @Query('resource_id') resourceId?: string,
+    @Query('success') success?: string,
+    @Query('status_min') statusMin?: string,
+    @Query('days') days?: string,
+    @Query('page') page?: string,
+    @Query('page_size') pageSize?: string,
+  ) {
+    return this.platformObservabilityService.listRequestEvents({
+      app_id: appId,
+      actor_user_id: actorUserId,
+      request_id: requestId,
+      module,
+      operation,
+      resource_type: resourceType,
+      resource_id: resourceId,
+      success,
+      status_min: statusMin,
+      days,
+      page,
+      page_size: pageSize,
+    });
+  }
+
+  @Get('observability/audit-events')
+  @ApiOperation({ summary: '平台审计事件' })
+  async listPlatformAuditEvents(
+    @Query('actor_user_id') actorUserId?: string,
+    @Query('app_id') appId?: string,
+    @Query('module') module?: string,
+    @Query('action') action?: string,
+    @Query('resource_type') resourceType?: string,
+    @Query('resource_id') resourceId?: string,
+    @Query('days') days?: string,
+    @Query('page') page?: string,
+    @Query('page_size') pageSize?: string,
+  ) {
+    return this.platformObservabilityService.listAuditEvents({
+      actor_user_id: actorUserId,
+      app_id: appId,
+      module,
+      action,
+      resource_type: resourceType,
+      resource_id: resourceId,
+      days,
+      page,
+      page_size: pageSize,
+    });
   }
 
   @Get('storage/providers')
@@ -1337,6 +1403,17 @@ export class PlatformAdminController {
   @ApiOperation({ summary: '删除租户模型路由覆盖' })
   async deleteAppAiModelRoute(@Param('app_id') appId: string, @Param('model_id') modelId: string) {
     return this.platformAdminService.deleteAppAiModelRoute(appId, modelId);
+  }
+
+  @Put('apps/:app_id/ai/model-visibility/:model_id')
+  @ApiOperation({ summary: '设置租户模型展示状态' })
+  async updateAppAiModelVisibility(
+    @Req() req: any,
+    @Param('app_id') appId: string,
+    @Param('model_id') modelId: string,
+    @Body() body: any,
+  ) {
+    return this.platformAdminService.upsertAppAiModelVisibility(appId, modelId, req.user.id, body || {});
   }
 
   @Get('apps/:app_id/ai/default-models')

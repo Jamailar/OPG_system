@@ -8,9 +8,48 @@ OPG 支持同一份 Dockerfile 生成三种运行镜像：
 | `gateway-runtime` | 分离部署后端 | Gateway API |
 | `web-runtime` | 分离部署前端 | Vite 静态资源服务 |
 
-PostgreSQL 和 Redis 不打包进应用镜像。生产环境应使用外部托管服务或独立容器，并通过环境变量连接。
+PostgreSQL 和 Redis 不打包进应用镜像。单机部署推荐使用根目录 `docker-compose.yml` 编排 OPG 应用容器、PostgreSQL 和 Redis；生产规模化部署可以改用外部托管数据库/Redis，并通过环境变量连接。
 
 ## 单容器部署
+
+这里的“单容器”指 OPG 应用自身是一个容器：Gateway API 和 Web 静态资源同进程同端口。数据库和 Redis 是基础设施依赖，仍由 Compose 或托管服务提供。
+
+推荐单机启动：
+
+```bash
+docker compose up -d --build
+```
+
+默认会启动：
+
+| Service | 镜像/Target | 用途 |
+| --- | --- | --- |
+| `opg` | 根 `Dockerfile` 的 `opg-all` target | Gateway API + Web 静态资源 |
+| `postgres` | `postgres:17-alpine` | 平台主数据库 |
+| `redis` | `redis:7-alpine` | AI 网关队列、限流、缓存等运行时依赖 |
+
+访问：
+
+```bash
+open http://localhost:3000
+```
+
+生产上线前至少覆盖这些值：
+
+```bash
+JWT_SECRET_KEY='replace-with-long-random-secret' \
+PLATFORM_SECRETS_KEY='replace-with-long-random-secret' \
+POSTGRES_PASSWORD='replace-with-strong-password' \
+docker compose up -d --build
+```
+
+如需修改宿主机端口：
+
+```bash
+OPG_PORT=8080 docker compose up -d --build
+```
+
+手动构建和连接外部数据库/Redis：
 
 构建：
 
@@ -40,7 +79,8 @@ docker run --rm -p 3000:3000 \
 | `/runtime-config` | 前端公开运行时配置 |
 | `/api/v1/*` | 平台 API |
 | `/{app}/v1/*` | App API |
-| `/healthz` | 健康检查 |
+| `/healthz` | 存活检查 |
+| `/readyz` | 就绪检查：数据库和平台观测表 |
 | `/api/docs` | Swagger 文档 |
 
 单容器模式下，前端会优先读取同源 `/runtime-config`。如果数据库里没有配置 `api_base_url`，前端默认使用当前 origin 作为 API 根地址，因此不需要设置 `VITE_API_BASE_URL`。

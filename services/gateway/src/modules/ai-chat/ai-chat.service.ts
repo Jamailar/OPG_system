@@ -414,6 +414,12 @@ export class AiChatService implements OnModuleInit {
     });
   }
 
+  clearModelPricingCacheForApp(appSlug: string) {
+    const cacheKey = this.buildModelPricingCacheKey(appSlug);
+    this.modelPricingCache.delete(cacheKey);
+    this.modelPricingInflight.delete(cacheKey);
+  }
+
   async chatLegacy(appSlug: string, payload: Record<string, unknown>, context: AiInvocationContext = {}) {
     const messages = this.normalizeLegacyMessages(payload);
     const systemPrompt = this.stringOrUndefined(payload.system_prompt ?? payload.systemPrompt ?? payload.context);

@@ -38,8 +38,8 @@ export class DeveloperSdkService {
     return {
       manifest_version: SDK_MANIFEST_VERSION,
       sdk: {
-        package: '@opg/sdk',
-        cli_package: '@opg/cli',
+        package: 'opg-sdk',
+        cli_package: 'opg-dev-cli',
         min_node_version: '22',
       },
       app: {
@@ -64,6 +64,13 @@ export class DeveloperSdkService {
         upload: true,
         video_async: true,
         usage: true,
+        database: {
+          app_namespace: true,
+          introspect: true,
+          query: true,
+          ddl_dry_run: true,
+          ddl_apply: true,
+        },
         api_catalog: true,
         developer_smoke_test: true,
       },
@@ -72,6 +79,11 @@ export class DeveloperSdkService {
         sdk_openapi: '/sdk/openapi.json',
         sdk_examples: '/sdk/examples',
         sdk_smoke_test: '/sdk/smoke-test',
+        database_manifest: '/sdk/database/manifest',
+        database_tables: '/sdk/database/tables',
+        database_table: '/sdk/database/tables/{table}',
+        database_query: '/sdk/database/query',
+        database_execute: '/sdk/database/execute',
         models: '/models',
         model_pricing: '/models/pricing',
         chat_completions: '/chat/completions',
@@ -95,9 +107,9 @@ export class DeveloperSdkService {
         user_ai_usage_logs: '/users/me/ai-usage-logs',
       },
       codex: {
-        install_command: `npx -y @opg/cli codex install --base-url ${options.baseUrl} --app ${app.slug}`,
+        install_command: `npx -y opg-dev-cli codex install --base-url ${options.baseUrl} --app ${app.slug}`,
         mcp_server_command: 'npx',
-        mcp_server_args: ['-y', '@opg/cli', 'mcp'],
+        mcp_server_args: ['-y', 'opg-dev-cli', 'mcp'],
         environment: ['OPG_BASE_URL', 'OPG_APP_SLUG', 'OPG_API_KEY'],
       },
     };
@@ -120,6 +132,11 @@ export class DeveloperSdkService {
       paths: {
         '/sdk/manifest': { get: { operationId: 'getSdkManifest', summary: 'Read OPG SDK manifest' } },
         '/sdk/smoke-test': { post: { operationId: 'runSdkSmokeTest', summary: 'Check SDK authentication and route contract' } },
+        '/sdk/database/manifest': { get: { operationId: 'getDatabaseManifest', summary: 'Read app-scoped database safety contract' } },
+        '/sdk/database/tables': { get: { operationId: 'listDatabaseTables', summary: 'List app-owned database tables' } },
+        '/sdk/database/tables/{table}': { get: { operationId: 'describeDatabaseTable', summary: 'Describe app-owned database table' } },
+        '/sdk/database/query': { post: { operationId: 'queryDatabase', summary: 'Run read-only SQL against app-owned tables' } },
+        '/sdk/database/execute': { post: { operationId: 'executeDatabaseSql', summary: 'Dry-run or apply SQL changes inside the app namespace' } },
         '/models': { get: { operationId: 'listModels', summary: 'List OpenAI-compatible models' } },
         '/chat/completions': { post: { operationId: 'createChatCompletion', summary: 'OpenAI-compatible chat completion' } },
         '/responses': { post: { operationId: 'createResponse', summary: 'OpenAI-compatible responses API' } },
@@ -151,7 +168,7 @@ export class DeveloperSdkService {
       'OPG_API_KEY=rbx_replace_me',
     ].join('\n');
 
-    const node = `import { createOpgClient } from '@opg/sdk';
+    const node = `import { createOpgClient } from 'opg-sdk';
 
 const opg = createOpgClient({
   baseUrl: process.env.OPG_BASE_URL!,
@@ -165,7 +182,7 @@ const result = await opg.agents.run('assistant', {
 
 console.log(result);`;
 
-    const react = `import { createOpgClient } from '@opg/sdk';
+    const react = `import { createOpgClient } from 'opg-sdk';
 
 const opg = createOpgClient({
   baseUrl: import.meta.env.VITE_OPG_BASE_URL,
@@ -177,19 +194,25 @@ export async function runAssistant(prompt: string) {
   return opg.agents.run('assistant', { input: { prompt } });
 }`;
 
-    const codex = `npx -y @opg/cli init --base-url ${options.baseUrl} --app ${manifest.app.slug}
-npx -y @opg/cli codex install --base-url ${options.baseUrl} --app ${manifest.app.slug}`;
+    const codex = `npx -y opg-dev-cli init --base-url ${options.baseUrl} --app ${manifest.app.slug}
+npx -y opg-dev-cli codex install --base-url ${options.baseUrl} --app ${manifest.app.slug}`;
+
+    const databaseNamespace = this.namespaceForApp(manifest.app.slug);
+    const database = `opg db smoke
+opg db query --sql "SELECT * FROM ${databaseNamespace}customers"
+opg db execute --sql "CREATE TABLE ${databaseNamespace}customers (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text NOT NULL, created_at timestamptz NOT NULL DEFAULT now())" --dry-run true`;
 
     return {
       target: normalizedTarget,
       env,
-      install: 'npm install @opg/sdk',
+      install: 'npm install opg-sdk',
       examples: {
         node,
         react,
         codex,
+        database,
       },
-      selected: normalizedTarget === 'react' ? react : normalizedTarget === 'codex' ? codex : node,
+      selected: normalizedTarget === 'react' ? react : normalizedTarget === 'codex' ? codex : normalizedTarget === 'database' ? database : node,
     };
   }
 
@@ -221,6 +244,11 @@ npx -y @opg/cli codex install --base-url ${options.baseUrl} --app ${manifest.app
         ok: true,
         message: 'Async video submit/query routes are present in the SDK manifest',
       },
+      {
+        key: 'database',
+        ok: true,
+        message: 'App-scoped database manifest/query/execute routes are present in the SDK manifest',
+      },
     ];
 
     return {
@@ -239,6 +267,7 @@ npx -y @opg/cli codex install --base-url ${options.baseUrl} --app ${manifest.app
       next: {
         list_models: `${manifest.app.api_base_url}${manifest.routes.models}`,
         list_agents: `${manifest.app.api_base_url}${manifest.routes.agents_list}`,
+        database_manifest: `${manifest.app.api_base_url}${manifest.routes.database_manifest}`,
       },
     };
   }
@@ -259,5 +288,15 @@ npx -y @opg/cli codex install --base-url ${options.baseUrl} --app ${manifest.app
       throw new NotFoundException('App not found');
     }
     return app;
+  }
+
+  private namespaceForApp(appSlug: string) {
+    const normalized = appSlug
+      .toLowerCase()
+      .replace(/[^a-z0-9_]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .replace(/_+/g, '_');
+    const safeSlug = normalized && /^[a-z_]/.test(normalized) ? normalized : `app_${normalized || 'default'}`;
+    return `app_${safeSlug}__`;
   }
 }

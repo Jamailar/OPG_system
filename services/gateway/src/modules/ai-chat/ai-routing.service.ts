@@ -273,6 +273,8 @@ type AiAppModelRouteJoinedRow = {
   model_is_default: boolean;
   model_is_active: boolean;
   model_is_visible: boolean;
+  app_model_is_visible: boolean | null;
+  app_model_visibility_updated_at: Date | null;
   default_source_id: string;
   default_source_name: string;
   default_source_provider_type: string;
@@ -381,6 +383,10 @@ export interface AiAppModelRouteInput {
   source_id?: string;
   is_active?: boolean;
   request_overrides?: Record<string, unknown>;
+}
+
+export interface AiAppModelVisibilityInput {
+  is_visible?: boolean;
 }
 
 export interface AiAppCapabilityDefaultInput {
@@ -2024,6 +2030,7 @@ export class AiRoutingService implements OnModuleInit {
 
     await this.prisma.$executeRawUnsafe(`DELETE FROM ai_app_model_routes WHERE global_model_id = $1::uuid`, modelId);
     await this.prisma.$executeRawUnsafe(`DELETE FROM ai_app_capability_defaults WHERE global_model_id = $1::uuid`, modelId);
+    await this.prisma.$executeRawUnsafe(`DELETE FROM ai_app_model_visibility WHERE global_model_id = $1::uuid`, modelId);
 
     if (usageCount > 0) {
       const archivedModelKey = this.buildArchivedModelKey(existing.model_key, modelId);
@@ -2157,6 +2164,8 @@ export class AiRoutingService implements OnModuleInit {
          m.is_default AS model_is_default,
          m.is_active AS model_is_active,
          m.is_visible AS model_is_visible,
+         v.is_visible AS app_model_is_visible,
+         v.updated_at AS app_model_visibility_updated_at,
          ds.id AS default_source_id,
          ds.name AS default_source_name,
          ds.provider_type AS default_source_provider_type,
@@ -2173,6 +2182,7 @@ export class AiRoutingService implements OnModuleInit {
        JOIN ai_global_sources ds ON ds.id = m.default_source_id
        LEFT JOIN ai_app_model_routes r ON r.global_model_id = m.id AND r.app_id = $1::uuid
        LEFT JOIN ai_global_sources rs ON rs.id = r.source_id
+       LEFT JOIN ai_app_model_visibility v ON v.global_model_id = m.id AND v.app_id = $1::uuid
       ORDER BY m.is_default DESC, m.model_key ASC`,
       appId,
     ) as Promise<AiAppModelRouteJoinedRow[]>);
@@ -2180,6 +2190,68 @@ export class AiRoutingService implements OnModuleInit {
     return {
       items: rows.map((row) => this.serializeAppModelRoute(row)),
     };
+  }
+
+  async upsertAppModelVisibility(
+    appId: string,
+    modelId: string,
+    actorUserId: string,
+    payload: AiAppModelVisibilityInput,
+  ) {
+    await this.ensureSchema();
+    await this.ensureAppById(appId);
+    await this.ensureGlobalModelExists(modelId);
+    const isVisible = payload.is_visible !== false;
+    const existingRows = await (this.prisma.$queryRawUnsafe(
+      `SELECT id, is_visible
+       FROM ai_app_model_visibility
+       WHERE app_id = $1::uuid AND global_model_id = $2::uuid
+       LIMIT 1`,
+      appId,
+      modelId,
+    ) as Promise<Array<{ id: string; is_visible: boolean }>>);
+    const existing = existingRows[0] || null;
+
+    const rows = existing
+      ? await (this.prisma.$queryRawUnsafe(
+          `UPDATE ai_app_model_visibility
+           SET is_visible = $1,
+               updated_by_user_id = $2::uuid,
+               updated_at = now()
+           WHERE id = $3::uuid
+           RETURNING id, app_id, global_model_id, is_visible, created_at, updated_at`,
+          isVisible,
+          actorUserId,
+          existing.id,
+        ) as Promise<Array<Record<string, unknown>>>)
+      : await (this.prisma.$queryRawUnsafe(
+          `INSERT INTO ai_app_model_visibility (
+             id, app_id, global_model_id, is_visible, created_by_user_id, updated_by_user_id
+           )
+           VALUES (gen_random_uuid(), $1::uuid, $2::uuid, $3, $4::uuid, $4::uuid)
+           RETURNING id, app_id, global_model_id, is_visible, created_at, updated_at`,
+          appId,
+          modelId,
+          isVisible,
+          actorUserId,
+        ) as Promise<Array<Record<string, unknown>>>);
+
+    this.clearResolvedRouteCache();
+    this.observability.recordAuditEventSafe({
+      actor_user_id: actorUserId,
+      app_id: appId,
+      action: 'ai_app_model_visibility.update',
+      resource_type: 'ai_app_model_visibility',
+      resource_id: modelId,
+      before: existing,
+      after: rows[0] || { app_id: appId, global_model_id: modelId, is_visible: isVisible },
+      metadata: {
+        model_id: modelId,
+        app_id: appId,
+        is_visible: isVisible,
+      },
+    });
+    return rows[0] || { app_id: appId, global_model_id: modelId, is_visible: isVisible };
   }
 
   async listAppCapabilityDefaults(appId: string) {
@@ -3463,7 +3535,12 @@ export class AiRoutingService implements OnModuleInit {
     });
 
     const models = routes.items
-      .filter((item: any) => item.model.is_active && item.model.is_visible !== false && item.effective_source?.is_active)
+      .filter((item: any) =>
+        item.model.is_active
+        && item.model.is_visible !== false
+        && item.app_visibility?.is_visible !== false
+        && item.effective_source?.is_active,
+      )
       .filter((item: any) => !capability || item.model.capability === capability)
       .map((item: any) => ({
         model_key: item.model.model_key,
@@ -4272,6 +4349,13 @@ export class AiRoutingService implements OnModuleInit {
         is_default: row.model_is_default,
         is_active: row.model_is_active,
         is_visible: row.model_is_visible,
+      },
+      app_visibility: {
+        is_visible: row.app_model_is_visible !== false,
+        is_explicit: row.app_model_is_visible !== null,
+        global_is_visible: row.model_is_visible,
+        effective_is_visible: row.model_is_visible !== false && row.app_model_is_visible !== false,
+        updated_at: row.app_model_visibility_updated_at,
       },
       default_source: {
         id: row.default_source_id,
@@ -7963,6 +8047,20 @@ export class AiRoutingService implements OnModuleInit {
     `);
 
     await this.prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS ai_app_model_visibility (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        app_id uuid NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+        global_model_id uuid NOT NULL REFERENCES ai_global_models(id) ON DELETE CASCADE,
+        is_visible boolean NOT NULL DEFAULT true,
+        created_by_user_id uuid NULL,
+        updated_by_user_id uuid NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (app_id, global_model_id)
+      )
+    `);
+
+    await this.prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS ai_model_source_routes (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         route_key varchar(96) NULL,
@@ -8328,6 +8426,11 @@ export class AiRoutingService implements OnModuleInit {
     await this.prisma.$executeRawUnsafe(`
       CREATE INDEX IF NOT EXISTS idx_ai_app_model_routes_app_model
       ON ai_app_model_routes(app_id, global_model_id)
+    `);
+
+    await this.prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS idx_ai_app_model_visibility_app_visible
+      ON ai_app_model_visibility(app_id, is_visible, global_model_id)
     `);
 
     await this.prisma.$executeRawUnsafe(`

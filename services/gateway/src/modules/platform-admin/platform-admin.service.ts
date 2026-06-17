@@ -6,6 +6,7 @@ import configuration from '../../config/configuration';
 import { PRISMA_CLIENT } from '../../config/database.module';
 import {
   AiAppModelRouteInput,
+  AiAppModelVisibilityInput,
   AiModelConnectivityTestResult,
   AiModelConnectivityTestInput,
   AiModelInput,
@@ -3106,6 +3107,18 @@ export class PlatformAdminService implements OnModuleInit {
   async deleteAppAiModelRoute(appId: string, modelId: string) {
     await this.ensureAppExists(appId);
     return this.aiRoutingService.deleteAppModelRoute(appId, modelId);
+  }
+
+  async upsertAppAiModelVisibility(
+    appId: string,
+    modelId: string,
+    actorUserId: string,
+    payload: AiAppModelVisibilityInput,
+  ) {
+    const app = await this.ensureAppExists(appId);
+    const result = await this.aiRoutingService.upsertAppModelVisibility(appId, modelId, actorUserId, payload || {});
+    this.aiChatService.clearModelPricingCacheForApp(app.slug);
+    return result;
   }
 
   async listAppAiCapabilityDefaults(appId: string) {

@@ -184,13 +184,120 @@ export class PaymentsController {
     const outTradeNo = String(result?.out_trade_no || '');
     const orderStatus = String(result?.order_status || 'PENDING').toUpperCase();
     const tradeNo = String(result?.trade_no || '');
+    const appName = String(result?.app_name || result?.app_slug || app || '应用');
     const isSuccess = orderStatus === 'PAID';
     const title = isSuccess ? '支付成功' : orderStatus === 'PENDING' ? '支付处理中' : '支付状态';
     const description = isSuccess
-      ? '订单已支付完成，积分将自动到账。可关闭此页面返回应用。'
-      : '订单状态已更新，可关闭此页面返回应用查看最新状态。';
-    const html = `<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${title}</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;color:#0f172a;margin:0;padding:24px}main{max-width:560px;margin:40px auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px;box-shadow:0 8px 28px rgba(15,23,42,.06)}h1{margin:0 0 12px;font-size:24px}p{margin:0 0 12px;color:#334155}.meta{margin-top:14px;font-size:13px;color:#475569}.meta code{background:#f1f5f9;padding:2px 6px;border-radius:6px}.hint{margin-top:16px;font-size:12px;color:#64748b}</style></head><body><main><h1>${title}</h1><p>${description}</p><div class="meta">订单号：<code>${outTradeNo || '-'}</code></div><div class="meta">交易号：<code>${tradeNo || '-'}</code></div><div class="meta">状态：<code>${orderStatus}</code></div><div class="hint">如果积分未立即变化，请稍后在应用内刷新或重新查询订单状态。</div></main></body></html>`;
+      ? '订单已支付完成，请返回应用查看权益或订单状态。'
+      : '订单状态已更新，请返回应用查看最新结果。';
+    const statusLabel = isSuccess ? '已支付' : orderStatus === 'PENDING' ? '处理中' : orderStatus;
+    const html = this.buildTradeReturnHtml({
+      appName,
+      title,
+      description,
+      outTradeNo,
+      tradeNo,
+      statusLabel,
+      isSuccess,
+    });
     return res.status(200).type('text/html; charset=utf-8').send(html);
+  }
+
+  private buildTradeReturnHtml(input: {
+    appName: string;
+    title: string;
+    description: string;
+    outTradeNo: string;
+    tradeNo: string;
+    statusLabel: string;
+    isSuccess: boolean;
+  }) {
+    const appName = this.escapeHtml(input.appName);
+    const title = this.escapeHtml(input.title);
+    const description = this.escapeHtml(input.description);
+    const outTradeNo = this.escapeHtml(input.outTradeNo || '-');
+    const tradeNo = this.escapeHtml(input.tradeNo || '-');
+    const statusLabel = this.escapeHtml(input.statusLabel);
+    const markClass = input.isSuccess ? 'success' : 'pending';
+    const mark = input.isSuccess ? '✓' : '…';
+
+    return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>${title} - ${appName}</title>
+  <style>
+    :root{color-scheme:light}
+    *{box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#f6f7f9;color:#111827;margin:0;min-height:100vh;display:grid;place-items:center;padding:24px}
+    .page{width:min(100%,420px);text-align:center}
+    .brand{margin:0 0 18px;font-size:15px;font-weight:700;color:#374151;letter-spacing:0}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:28px 24px 22px;box-shadow:0 18px 44px rgba(17,24,39,.08)}
+    .mark{width:56px;height:56px;margin:0 auto 18px;border-radius:999px;display:grid;place-items:center;font-size:34px;line-height:1}
+    .mark.success{background:#ecfdf3;color:#16a34a}
+    .mark.pending{background:#f3f4f6;color:#6b7280}
+    h1{margin:0 0 10px;font-size:24px;line-height:1.2;color:#111827}
+    p{margin:0;color:#4b5563;font-size:15px;line-height:1.7}
+    .meta{margin:20px 0 0;padding:14px 0;border-top:1px solid #f0f2f5;border-bottom:1px solid #f0f2f5;text-align:left}
+    .row{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:5px 0;font-size:13px;color:#6b7280}
+    .row span:last-child{min-width:0;text-align:right;color:#374151;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .actions{display:flex;justify-content:center;margin-top:18px}
+    .close{appearance:none;border:0;border-radius:10px;background:#111827;color:#fff;height:40px;padding:0 18px;font-size:14px;font-weight:600;cursor:pointer}
+    .close:active{transform:translateY(1px)}
+    .hint{margin-top:14px;font-size:13px;color:#6b7280}
+    @media (max-width:480px){body{padding:18px}.card{border-radius:14px;padding:24px 20px 20px}.row{display:block}.row span:last-child{display:block;margin-top:3px;text-align:left}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <p class="brand">${appName}</p>
+    <section class="card" aria-label="支付结果">
+      <div class="mark ${markClass}" aria-hidden="true">${mark}</div>
+      <h1>${title}</h1>
+      <p>${description}</p>
+      <div class="meta">
+        <div class="row"><span>订单号</span><span title="${outTradeNo}">${outTradeNo}</span></div>
+        <div class="row"><span>交易号</span><span title="${tradeNo}">${tradeNo}</span></div>
+        <div class="row"><span>状态</span><span>${statusLabel}</span></div>
+      </div>
+      <div class="actions"><button class="close" type="button" onclick="window.close()">关闭页面</button></div>
+      <p class="hint"><span id="countdown">3</span> 秒后将尝试自动关闭，也可以手动关闭此页返回应用。</p>
+    </section>
+  </main>
+  <script>
+    (function(){
+      var left = 3;
+      var el = document.getElementById('countdown');
+      var timer = setInterval(function(){
+        left -= 1;
+        if (el) el.textContent = String(Math.max(left, 0));
+        if (left <= 0) {
+          clearInterval(timer);
+          window.close();
+        }
+      }, 1000);
+    })();
+  </script>
+</body>
+</html>`;
+  }
+
+  private escapeHtml(value: string) {
+    return value.replace(/[&<>"']/g, (char) => {
+      switch (char) {
+        case '&':
+          return '&amp;';
+        case '<':
+          return '&lt;';
+        case '>':
+          return '&gt;';
+        case '"':
+          return '&quot;';
+        default:
+          return '&#39;';
+      }
+    });
   }
 
   @Post('callbacks/agreement-notify')

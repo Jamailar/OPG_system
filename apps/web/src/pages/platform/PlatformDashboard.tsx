@@ -1,19 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { PlatformAppItem, platformApi } from '@/lib/api';
+import { PlatformAppItem, PlatformObservabilityRuntime, platformApi } from '@/lib/api';
 import { pickApiData, pickApiErrorMessage } from '@/lib/api-response';
 
 export default function PlatformDashboard() {
   const [loading, setLoading] = useState(false);
   const [apps, setApps] = useState<PlatformAppItem[]>([]);
+  const [observability, setObservability] = useState<PlatformObservabilityRuntime | null>(null);
   const [error, setError] = useState('');
 
   const fetchApps = async () => {
     setLoading(true);
     setError('');
     try {
-      const payload = pickApiData<{ items: PlatformAppItem[] }>(await platformApi.listApps(true));
-      setApps(payload?.items || []);
+      const [appsPayload, observabilityPayload] = await Promise.all([
+        platformApi.listApps(true),
+        platformApi.getPlatformObservabilityRuntime().catch(() => null),
+      ]);
+      const nextApps = pickApiData<{ items: PlatformAppItem[] }>(appsPayload);
+      setApps(nextApps?.items || []);
+      setObservability(observabilityPayload ? pickApiData<PlatformObservabilityRuntime>(observabilityPayload) : null);
     } catch (e: any) {
       setError(pickApiErrorMessage(e, '加载平台数据失败'));
     } finally {
@@ -40,6 +46,15 @@ export default function PlatformDashboard() {
         .slice(0, 8),
     [apps],
   );
+
+  const observabilityStats = useMemo(() => {
+    const modules = observability?.modules || [];
+    const events = modules.reduce((sum, item) => sum + Number(item.events_count || 0), 0);
+    const failures = modules.reduce((sum, item) => sum + Number(item.failures_count || 0), 0);
+    const slow = modules.reduce((sum, item) => sum + Number(item.slow_count || 0), 0);
+    const activeModules = modules.length;
+    return { events, failures, slow, activeModules };
+  }, [observability]);
 
   return (
     <div className="platform-page">
@@ -75,6 +90,49 @@ export default function PlatformDashboard() {
       </div>
 
       <div className="platform-grid-two">
+        <section className="card">
+          <div className="platform-section-head">
+            <h3>运行观测</h3>
+            <Link to="/platform-admin/observability" className="btn btn-secondary btn-sm">
+              详情
+            </Link>
+          </div>
+          <div className="platform-stats-grid compact">
+            <div className="platform-stat-card">
+              <span>1 小时事件</span>
+              <strong>{observabilityStats.events}</strong>
+            </div>
+            <div className="platform-stat-card">
+              <span>失败</span>
+              <strong>{observabilityStats.failures}</strong>
+            </div>
+            <div className="platform-stat-card">
+              <span>慢请求</span>
+              <strong>{observabilityStats.slow}</strong>
+            </div>
+            <div className="platform-stat-card">
+              <span>模块</span>
+              <strong>{observabilityStats.activeModules}</strong>
+            </div>
+          </div>
+          <div className="platform-list">
+            {(observability?.recent_errors || []).slice(0, 6).map((item) => (
+              <div className="platform-list-item" key={item.id}>
+                <div>
+                  <strong>{item.module}</strong>
+                  <p>
+                    {item.status_code || '-'} · <code>{item.request_id || item.id}</code>
+                  </p>
+                </div>
+                <span className="status-tag error">{item.error_category || 'error'}</span>
+              </div>
+            ))}
+            {observability?.schema_ready && !(observability?.recent_errors || []).length && <div className="loading">暂无错误事件</div>}
+            {observability && !observability.schema_ready && <div className="loading">观测表未就绪</div>}
+            {!observability && <div className="loading">暂无观测数据</div>}
+          </div>
+        </section>
+
         <section className="card">
           <div className="platform-section-head">
             <h3>最近更新的租户应用</h3>

@@ -30,6 +30,20 @@ export type OpgVideoTaskInput = {
   [key: string]: unknown;
 };
 
+export type OpgDatabaseQueryInput = {
+  sql: string;
+  params?: unknown[];
+  limit?: number;
+};
+
+export type OpgDatabaseExecuteInput = {
+  sql: string;
+  params?: unknown[];
+  dryRun?: boolean;
+  dry_run?: boolean;
+  confirm?: string | boolean;
+};
+
 type OpgClientInternals = {
   request<T = unknown>(path: string, options?: OpgRequestOptions): Promise<T>;
   stream(path: string, options?: OpgRequestOptions): AsyncIterable<string>;
@@ -71,6 +85,13 @@ export type OpgClient = OpgClientInternals & {
   };
   usage: {
     aiLogs(query?: { page?: number; limit?: number }): Promise<Record<string, unknown>>;
+  };
+  database: {
+    manifest(): Promise<Record<string, unknown>>;
+    tables(): Promise<Record<string, unknown>>;
+    describe(table: string): Promise<Record<string, unknown>>;
+    query(input: OpgDatabaseQueryInput): Promise<Record<string, unknown>>;
+    execute(input: OpgDatabaseExecuteInput): Promise<Record<string, unknown>>;
   };
 };
 
@@ -161,6 +182,13 @@ export function createOpgClient(options: OpgClientOptions): OpgClient {
     },
     usage: {
       aiLogs: (query) => request('/users/me/ai-usage-logs', { query }),
+    },
+    database: {
+      manifest: () => request('/sdk/database/manifest'),
+      tables: () => request('/sdk/database/tables'),
+      describe: (table) => request(`/sdk/database/tables/${encodeURIComponent(table)}`),
+      query: (input) => request('/sdk/database/query', { method: 'POST', body: input }),
+      execute: (input) => request('/sdk/database/execute', { method: 'POST', body: input }),
     },
   };
 }

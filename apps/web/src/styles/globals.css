@@ -5033,6 +5033,15 @@ code {
   background: var(--info);
 }
 
+.status-tag.muted {
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+}
+
+.status-tag.muted::before {
+  background: var(--text-muted);
+}
+
 
 /* ── 列表项 ── */
 .list-item {

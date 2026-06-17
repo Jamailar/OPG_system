@@ -53,6 +53,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       code: status,
       message,
       errors,
+      request_id: (request as any)?.requestId || null,
     });
   }
 

@@ -1439,6 +1439,8 @@ export class PaymentsService implements OnModuleInit {
     return {
       return_mode: returnMode,
       redirect_url: returnMode === 'redirect' ? redirectUrl : '',
+      app_name: app.name,
+      app_slug: app.slug,
       out_trade_no: outTradeNo,
       order_status: orderStatus,
       trade_no: payload?.trade_no ? String(payload.trade_no) : '',

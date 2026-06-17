@@ -18,6 +18,7 @@ import { OutboundProxyModule } from './modules/outbound-proxy/outbound-proxy.mod
 import { AcquisitionModule } from './modules/acquisition/acquisition.module';
 import { RuntimeSettingsModule } from './modules/runtime-settings/runtime-settings.module';
 import { DeveloperSdkModule } from './modules/developer-sdk/developer-sdk.module';
+import { ObservabilityModule } from './modules/observability/observability.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
@@ -29,6 +30,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     }),
     ScheduleModule.forRoot(),
     DatabaseModule,
+    ObservabilityModule,
     AuthModule,
     UsersModule,
     UploadModule,

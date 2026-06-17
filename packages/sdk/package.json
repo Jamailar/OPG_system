@@ -1,7 +1,8 @@
 {
-  "name": "@opg/sdk",
-  "version": "0.1.0",
+  "name": "opg-sdk",
+  "version": "0.2.1",
   "description": "OPG Developer SDK for AI apps, agents, uploads, async video tasks, and usage inspection.",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,8 +13,14 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },

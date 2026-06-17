@@ -1,13 +1,17 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { resolveAppSlug, tenantControllerPaths } from '../../common/utils/controller-paths';
+import { DeveloperDatabaseService } from './developer-database.service';
 import { DeveloperSdkAuthGuard } from './developer-sdk-auth.guard';
 import { DeveloperSdkService } from './developer-sdk.service';
 
 @ApiTags('DeveloperSDK')
 @Controller(tenantControllerPaths('sdk', true))
 export class DeveloperSdkController {
-  constructor(private readonly developerSdkService: DeveloperSdkService) {}
+  constructor(
+    private readonly developerSdkService: DeveloperSdkService,
+    private readonly developerDatabaseService: DeveloperDatabaseService,
+  ) {}
 
   @Get('manifest')
   @ApiOperation({ summary: 'OPG SDK manifest for the current app' })
@@ -43,7 +47,7 @@ export class DeveloperSdkController {
     const manifest = await this.developerSdkService.getManifest(resolveAppSlug(req), this.getRequestOptions(req));
     return {
       profile: String(body?.profile || 'default').trim() || 'default',
-      client: String(body?.client || 'opg-cli').trim() || 'opg-cli',
+      client: String(body?.client || 'opg-dev-cli').trim() || 'opg-dev-cli',
       app: manifest.app,
       env: {
         OPG_BASE_URL: this.getRequestOptions(req).baseUrl,
@@ -51,6 +55,46 @@ export class DeveloperSdkController {
       },
       codex: manifest.codex,
     };
+  }
+
+  @Get('database/manifest')
+  @UseGuards(DeveloperSdkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Return app-scoped database namespace and safety contract' })
+  async databaseManifest(@Req() req: any) {
+    return this.developerDatabaseService.getManifest({ appSlug: resolveAppSlug(req), actor: req.user });
+  }
+
+  @Get('database/tables')
+  @UseGuards(DeveloperSdkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List app-owned database tables visible to the SDK' })
+  async databaseTables(@Req() req: any) {
+    return this.developerDatabaseService.listTables({ appSlug: resolveAppSlug(req), actor: req.user });
+  }
+
+  @Get('database/tables/:table')
+  @UseGuards(DeveloperSdkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Describe an app-owned database table' })
+  async databaseTable(@Req() req: any, @Param('table') table: string) {
+    return this.developerDatabaseService.describeTable({ appSlug: resolveAppSlug(req), actor: req.user }, table);
+  }
+
+  @Post('database/query')
+  @UseGuards(DeveloperSdkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Run a read-only SQL query against app-owned database tables' })
+  async databaseQuery(@Req() req: any, @Body() body: Record<string, unknown>) {
+    return this.developerDatabaseService.query({ appSlug: resolveAppSlug(req), actor: req.user }, body);
+  }
+
+  @Post('database/execute')
+  @UseGuards(DeveloperSdkAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Dry-run or apply SQL changes inside the app-owned database namespace' })
+  async databaseExecute(@Req() req: any, @Body() body: Record<string, unknown>) {
+    return this.developerDatabaseService.execute({ appSlug: resolveAppSlug(req), actor: req.user }, body);
   }
 
   private getRequestOptions(req: any) {

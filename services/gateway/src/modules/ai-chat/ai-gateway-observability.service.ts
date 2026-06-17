@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { createHash } from 'crypto';
 import { PRISMA_CLIENT } from '../../config/database.module';
+import { PlatformObservabilityService } from '../observability/platform-observability.service';
 import { AiGatewayErrorClassifierService } from './ai-gateway-error-classifier.service';
 import type { ResolvedAiRoute } from './ai-routing.service';
 
@@ -91,6 +92,7 @@ export class AiGatewayObservabilityService implements OnModuleInit {
   constructor(
     @Inject(PRISMA_CLIENT) private readonly prisma: PrismaClient,
     private readonly errorClassifier: AiGatewayErrorClassifierService,
+    private readonly platformObservability: PlatformObservabilityService,
   ) {}
 
   async onModuleInit() {
@@ -145,6 +147,35 @@ export class AiGatewayObservabilityService implements OnModuleInit {
       this.normalizeNullableString(input.upstream_request_id, 128),
       JSON.stringify(this.normalizeMetadata(input.metadata)),
     );
+    this.platformObservability.recordRequestEventSafe({
+      request_id: input.request_id,
+      app_id: input.app_id || route?.app_id || null,
+      app_slug: input.app_slug || route?.app_slug || null,
+      actor_user_id: input.user_id || null,
+      module: 'ai.gateway',
+      operation: route?.capability ? `${route.capability}.${input.stage}` : input.stage,
+      resource_type: route?.model_key ? 'ai_model' : 'ai_request',
+      resource_id: route?.model_key || input.usage_reference_id || null,
+      stage: input.stage,
+      request_path: input.request_path || null,
+      success: input.success === undefined || input.success === null ? null : input.success === true,
+      status_code: statusCode,
+      error_category: errorCategory,
+      error_message: errorMessage,
+      latency_ms: this.normalizeNullableInt(input.latency_ms),
+      metadata: {
+        usage_reference_id: input.usage_reference_id || null,
+        route_key: route?.route_key || null,
+        model_id: route?.model_id || null,
+        model_key: route?.model_key || null,
+        capability: route?.capability || null,
+        source_id: route?.source.id || null,
+        source_name: route?.source.name || null,
+        provider_type: route?.source.provider_type || null,
+        upstream_request_id: input.upstream_request_id || null,
+        ...(input.metadata || {}),
+      },
+    });
   }
 
   recordRequestEventSafe(input: RequestEventInput): void {
@@ -277,6 +308,17 @@ export class AiGatewayObservabilityService implements OnModuleInit {
       this.hashSnapshot(input.after),
       JSON.stringify(this.normalizeMetadata(input.metadata)),
     );
+    this.platformObservability.recordAuditEventSafe({
+      actor_user_id: input.actor_user_id || null,
+      app_id: input.app_id || null,
+      module: 'ai.config',
+      action: input.action,
+      resource_type: input.resource_type,
+      resource_id: input.resource_id || null,
+      before: input.before,
+      after: input.after,
+      metadata: input.metadata,
+    });
   }
 
   recordAuditEventSafe(input: AuditEventInput): void {

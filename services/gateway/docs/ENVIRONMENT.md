@@ -278,18 +278,33 @@ AppID/Secret 在 DB 按租户配置。
 
 ### 观测、健康与审计
 
-AI 网关稳定性数据不依赖额外环境变量，服务启动时会确保以下持久化结构存在：
+平台观测和 AI 网关稳定性数据不依赖额外环境变量，服务启动时会确保以下持久化结构存在：
 
 | 表 | 用途 |
 | --- | --- |
+| `platform_request_events` | 平台级请求事件链，按 `request_id` 串联 HTTP、AI、上游错误、慢请求和关键后台操作 |
+| `platform_audit_events` | 平台级审计事件，记录写操作 actor、module、action、resource、before/after hash 和脱敏 metadata |
 | `ai_provider_health` | 记录 source / model / route / capability / api key 维度的健康状态、连续失败、冷却时间和平均延迟 |
 | `ai_gateway_request_events` | 记录一次转发请求的关键阶段：`selected`、`upstream_response`、`upstream_error`、`usage_recorded`、`points_charged` 等 |
 | `ai_audit_events` | 记录 AI source、model、tenant route、默认模型等配置变更的审计哈希和元数据 |
+
+默认保留期：
+
+| 表 | 保留期 | 清理方式 |
+| --- | --- | --- |
+| `platform_request_events` | 30 天 | 每小时批量删除，每批最多 5000 行 |
+| `platform_audit_events` | 180 天 | 每小时批量删除，每批最多 5000 行 |
+
+写操作审计不受 access log 采样影响；`POST` / `PUT` / `PATCH` / `DELETE` 会写入平台请求事件和平台审计事件。审计 `after_hash` 使用有边界的脱敏请求体快照生成，不保存原始请求体和密钥明文。
 
 管理端查询接口：
 
 | 接口 | 说明 |
 | --- | --- |
+| `GET /readyz` / `GET /api/v1/readyz` | 就绪检查，验证数据库和平台观测表是否可用 |
+| `GET /api/v1/:app_slug/platform-admin/observability/runtime` | 查看平台级 1 小时模块事件、失败、慢请求摘要、表状态和保留期 |
+| `GET /api/v1/:app_slug/platform-admin/observability/request-events` | 按 `request_id` / `module` / `resource` 追踪平台请求事件 |
+| `GET /api/v1/:app_slug/platform-admin/observability/audit-events` | 查看平台级写操作审计事件 |
 | `GET /api/v1/:app_slug/platform-admin/ai/gateway/provider-health` | 查看供应商和 key 粒度健康状态 |
 | `GET /api/v1/:app_slug/platform-admin/ai/gateway/request-events` | 按 `request_id` / `usage_reference_id` 追踪请求事件 |
 | `GET /api/v1/:app_slug/platform-admin/ai/audit-events` | 查看 AI 配置审计事件 |

@@ -9,6 +9,8 @@ import {
 import { Observable } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 import { throwError } from 'rxjs';
+import { PlatformObservabilityService } from '../../modules/observability/platform-observability.service';
+import { PlatformRequestContextService } from '../../modules/observability/platform-request-context.service';
 
 type AccessLogMode = 'off' | 'error' | 'slow' | 'sample' | 'all';
 
@@ -29,6 +31,11 @@ export class LoggingInterceptor implements NestInterceptor {
     60 * 60 * 1000,
   );
 
+  constructor(
+    private readonly observability: PlatformObservabilityService,
+    private readonly requestContext: PlatformRequestContextService,
+  ) {}
+
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
     const { method, ip } = request;
@@ -42,11 +49,13 @@ export class LoggingInterceptor implements NestInterceptor {
         const { statusCode } = response;
         const duration = Date.now() - now;
         this.logRequest(method, url, statusCode, duration, ip, userAgent);
+        this.recordRequestEvent(request, method, url, statusCode, duration, ip, userAgent);
       }),
       catchError((error) => {
         const duration = Date.now() - now;
         const statusCode = this.resolveStatusCode(error);
         this.logRequest(method, url, statusCode, duration, ip, userAgent);
+        this.recordRequestEvent(request, method, url, statusCode, duration, ip, userAgent, error);
         return throwError(() => error);
       }),
     );
@@ -74,6 +83,186 @@ export class LoggingInterceptor implements NestInterceptor {
       return;
     }
     this.logger.log(message);
+  }
+
+  private recordRequestEvent(
+    request: any,
+    method: string,
+    url: string,
+    statusCode: number,
+    duration: number,
+    ip: string,
+    userAgent: string,
+    error?: unknown,
+  ): void {
+    const shouldRecordRequest = this.shouldRecordEvent(url, statusCode, duration) || this.isMutationMethod(method);
+    if (!shouldRecordRequest) {
+      return;
+    }
+
+    const context = this.requestContext.get();
+    const errorMessage = error instanceof Error ? error.message : String((error as any)?.message || '');
+    this.observability.recordRequestEventSafe({
+      request_id: request?.requestId || context?.request_id || null,
+      trace_id: request?.traceId || context?.trace_id || null,
+      app_id: request?.user?.app_id || request?.user?.appId || null,
+      app_slug: request?.user?.app_slug || request?.user?.appSlug || null,
+      actor_user_id: request?.user?.id || request?.user?.userId || null,
+      module: this.resolveModule(url),
+      operation: `${String(method || 'GET').toUpperCase()} ${this.normalizeRoutePath(url)}`,
+      stage: 'http_completed',
+      method,
+      request_path: this.normalizeRoutePath(url),
+      success: statusCode < 400,
+      status_code: statusCode,
+      error_category: statusCode >= 500 ? 'server_error' : statusCode >= 400 ? 'client_error' : null,
+      error_message: statusCode >= 400 ? errorMessage || null : null,
+      latency_ms: duration,
+      ip_address: ip,
+      user_agent: userAgent,
+    });
+    this.recordMutationAudit(request, method, url, statusCode, duration);
+  }
+
+  private recordMutationAudit(request: any, method: string, url: string, statusCode: number, duration: number): void {
+    const normalizedMethod = String(method || '').toUpperCase();
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(normalizedMethod)) {
+      return;
+    }
+    const path = this.normalizeRoutePath(url);
+    if (this.isLowSignalPath(path)) {
+      return;
+    }
+
+    this.observability.recordAuditEventSafe({
+      request_id: request?.requestId || this.requestContext.getRequestId(),
+      actor_user_id: request?.user?.id || request?.user?.userId || null,
+      app_id: request?.user?.app_id || request?.user?.appId || null,
+      app_slug: request?.user?.app_slug || request?.user?.appSlug || null,
+      module: this.resolveModule(path),
+      action: `${normalizedMethod} ${path}`.slice(0, 96),
+      resource_type: this.resolveResourceType(path),
+      resource_id: this.resolveResourceId(path),
+      after: this.buildAuditSnapshot(request?.body),
+      metadata: {
+        success: statusCode < 400,
+        status_code: statusCode,
+        latency_ms: duration,
+        body_shape: this.resolveBodyShape(request?.body),
+      },
+    });
+  }
+
+  private isMutationMethod(method: string): boolean {
+    return ['POST', 'PUT', 'PATCH', 'DELETE'].includes(String(method || '').toUpperCase());
+  }
+
+  private buildAuditSnapshot(value: unknown, depth = 0): unknown {
+    if (value === undefined || value === null) {
+      return null;
+    }
+    if (depth > 4) {
+      return '[max-depth]';
+    }
+    if (Array.isArray(value)) {
+      return value.slice(0, 20).map((item) => this.buildAuditSnapshot(item, depth + 1));
+    }
+    if (Buffer.isBuffer(value)) {
+      return `[buffer:${value.length}]`;
+    }
+    if (typeof value === 'string') {
+      return value.length > 512 ? `${value.slice(0, 512)}...[truncated:${value.length}]` : value;
+    }
+    if (typeof value !== 'object') {
+      return value;
+    }
+
+    const output: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value as Record<string, unknown>).slice(0, 80)) {
+      const normalizedKey = key.toLowerCase();
+      if (
+        normalizedKey.includes('key') ||
+        normalizedKey.includes('secret') ||
+        normalizedKey.includes('token') ||
+        normalizedKey.includes('credential') ||
+        normalizedKey.includes('password')
+      ) {
+        output[key] = item ? '[redacted]' : item;
+      } else {
+        output[key] = this.buildAuditSnapshot(item, depth + 1);
+      }
+    }
+    return output;
+  }
+
+  private resolveBodyShape(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object') {
+      return {
+        type: value === null || value === undefined ? 'empty' : typeof value,
+      };
+    }
+    if (Array.isArray(value)) {
+      return {
+        type: 'array',
+        length: value.length,
+      };
+    }
+    return {
+      type: 'object',
+      keys: Object.keys(value as Record<string, unknown>).slice(0, 40),
+    };
+  }
+
+  private resolveResourceType(path: string): string {
+    const segments = path.split('/').filter(Boolean);
+    const platformAdminIndex = segments.indexOf('platform-admin');
+    if (platformAdminIndex >= 0 && segments[platformAdminIndex + 1]) {
+      return segments[platformAdminIndex + 1].slice(0, 64);
+    }
+    const versionIndex = segments.indexOf('v1');
+    if (versionIndex >= 0 && segments[versionIndex + 1]) {
+      return segments[versionIndex + 1].slice(0, 64);
+    }
+    return (segments[0] || 'http').slice(0, 64);
+  }
+
+  private resolveResourceId(path: string): string | null {
+    const match = path.match(/\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i);
+    return match?.[1] || null;
+  }
+
+  private shouldRecordEvent(url: string, statusCode: number, duration: number): boolean {
+    if (this.isLowSignalPath(url)) {
+      return statusCode >= 500 || duration >= this.slowRequestMs;
+    }
+    if (statusCode >= 400 || duration >= this.slowRequestMs) {
+      return true;
+    }
+    if (this.accessLogMode === 'all') {
+      return true;
+    }
+    if (this.accessLogMode === 'sample') {
+      return this.sampleRate > 0 && Math.random() < this.sampleRate;
+    }
+    return false;
+  }
+
+  private resolveModule(url: string): string {
+    const path = this.normalizeRoutePath(url);
+    const platformMatch = path.match(/^\/(?:api\/v1\/)?platform-admin\/([^/?]+)/);
+    if (platformMatch?.[1]) {
+      return `platform.${platformMatch[1]}`.slice(0, 64);
+    }
+    const tenantMatch = path.match(/^\/(?:api\/v1\/)?([^/]+)\/v1\/([^/?]+)/);
+    if (tenantMatch?.[2]) {
+      return tenantMatch[2].slice(0, 64);
+    }
+    const firstSegment = path.split('/').filter(Boolean)[0] || 'http';
+    return firstSegment.slice(0, 64);
+  }
+
+  private normalizeRoutePath(url: string): string {
+    return (url.split('?')[0] || '/').slice(0, 255);
   }
 
   private shouldLog(url: string, statusCode: number, duration: number): boolean {
@@ -106,6 +295,9 @@ export class LoggingInterceptor implements NestInterceptor {
     return path === '/'
       || path === '/health'
       || path === '/healthz'
+      || path === '/api/v1/health'
+      || path === '/readyz'
+      || path === '/api/v1/readyz'
       || path === '/api/docs'
       || path.startsWith('/socket.io')
       || path.endsWith('/socket.io');
