@@ -2,6 +2,140 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- Core tenant and user tables. This migration is the bootstrap migration for
+-- self-hosted OPG installs, so it must not assume seed tables already exist.
+CREATE TABLE IF NOT EXISTS apps (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug varchar(64) NOT NULL UNIQUE,
+  name varchar(128) NOT NULL,
+  status varchar(32) NOT NULL DEFAULT 'ACTIVE',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS app_domains (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  app_id uuid NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+  domain varchar(255) NOT NULL UNIQUE,
+  domain_type varchar(32) NOT NULL,
+  is_primary boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  app_id uuid NOT NULL UNIQUE REFERENCES apps(id) ON DELETE CASCADE,
+  app_url text NULL,
+  brand_name varchar(128) NULL,
+  sender_name varchar(128) NULL,
+  sender_nickname varchar(128) NULL,
+  wechat_redirect_uri text NULL,
+  alipay_notify_url text NULL,
+  alipay_agreement_notify_url text NULL,
+  extra_json jsonb NULL,
+  notes text NULL,
+  email_primary_color varchar(32) NULL,
+  email_secondary_color varchar(32) NULL,
+  email_greeting varchar(255) NULL,
+  email_code_label varchar(128) NULL,
+  email_expire_text varchar(255) NULL,
+  email_footer_text text NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  app_id uuid NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+  email varchar(255) NOT NULL,
+  hashed_password text NOT NULL DEFAULT '',
+  full_name varchar(255) NULL,
+  display_name varchar(255) NULL,
+  avatar_url text NULL,
+  role varchar(32) NOT NULL DEFAULT 'USER',
+  admin_type varchar(32) NULL,
+  is_active boolean NOT NULL DEFAULT true,
+  is_superuser boolean NOT NULL DEFAULT false,
+  session_token text NULL,
+  current_refresh_token_hash text NULL,
+  refresh_token_issued_at timestamptz NULL,
+  refresh_token_last_used_at timestamptz NULL,
+  apple_sub varchar(255) NULL,
+  apple_email varchar(255) NULL,
+  wechat_openid varchar(255) NULL,
+  wechat_unionid varchar(255) NULL,
+  phone varchar(64) NULL,
+  phone_verified boolean NOT NULL DEFAULT false,
+  membership_type varchar(32) NOT NULL DEFAULT 'FREE',
+  membership_expires_at timestamptz NULL,
+  account_type varchar(32) NOT NULL DEFAULT 'REGISTERED',
+  primary_auth_provider varchar(64) NULL,
+  is_anonymous boolean NOT NULL DEFAULT false,
+  last_login_at timestamptz NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  deleted_at timestamptz NULL,
+  deactivated_at timestamptz NULL,
+  deactivated_by_user_id uuid NULL,
+  deactivation_reason text NULL,
+  deactivated_email varchar(255) NULL,
+  deactivated_phone varchar(64) NULL,
+  UNIQUE (email, app_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_app_domains_app_id ON app_domains(app_id);
+CREATE INDEX IF NOT EXISTS idx_users_app_id ON users(app_id);
+CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
+CREATE INDEX IF NOT EXISTS idx_users_session_token ON users(session_token);
+CREATE INDEX IF NOT EXISTS idx_users_apple_sub ON users(apple_sub);
+CREATE INDEX IF NOT EXISTS idx_users_wechat_openid ON users(wechat_openid);
+CREATE INDEX IF NOT EXISTS idx_users_wechat_unionid ON users(wechat_unionid);
+CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at);
+
+CREATE TABLE IF NOT EXISTS content_items (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  app_id uuid NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+  title varchar(255) NOT NULL DEFAULT '',
+  content_type varchar(64) NOT NULL DEFAULT 'document',
+  status varchar(32) NOT NULL DEFAULT 'draft',
+  metadata_json jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  deleted_at timestamptz NULL
+);
+
+CREATE TABLE IF NOT EXISTS content_assignments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  app_id uuid NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+  content_item_id uuid NOT NULL REFERENCES content_items(id) ON DELETE CASCADE,
+  user_id uuid NULL REFERENCES users(id) ON DELETE CASCADE,
+  status varchar(32) NOT NULL DEFAULT 'assigned',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS vocabulary_books (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  app_id uuid NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+  title varchar(255) NOT NULL DEFAULT '',
+  language varchar(50) NOT NULL DEFAULT 'en',
+  cover_url varchar(2048) NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS vocabulary_chapters (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  app_id uuid NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+  book_id uuid NOT NULL REFERENCES vocabulary_books(id) ON DELETE CASCADE,
+  title varchar(255) NOT NULL DEFAULT '',
+  cover_url varchar(2048) NULL,
+  sort_order integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- Platform analytics read models and refresh state.
 CREATE TABLE IF NOT EXISTS analytics_fact_refresh_state (
   job_name varchar(64) NOT NULL,
@@ -154,15 +288,6 @@ ON users(app_id, deleted_at, last_login_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_users_app_membership_deleted_created_at
 ON users(app_id, membership_type, deleted_at, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_alipay_orders_app_status_paid_at
-ON alipay_orders(app_id, status, paid_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_alipay_orders_app_user_status_paid_at
-ON alipay_orders(app_id, user_id, status, paid_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_user_behavior_events_app_user_occurred_at
-ON user_behavior_events(app_id, user_id, occurred_at ASC);
 
 -- AI routing and facts.
 CREATE TABLE IF NOT EXISTS ai_global_sources (
@@ -615,6 +740,10 @@ CREATE INDEX IF NOT EXISTS idx_alipay_orders_app_created
 ON alipay_orders(app_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_alipay_orders_app_user
 ON alipay_orders(app_id, user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_alipay_orders_app_status_paid_at
+ON alipay_orders(app_id, status, paid_at DESC);
+CREATE INDEX IF NOT EXISTS idx_alipay_orders_app_user_status_paid_at
+ON alipay_orders(app_id, user_id, status, paid_at DESC);
 CREATE INDEX IF NOT EXISTS idx_alipay_agreements_app_status
 ON alipay_agreements(app_id, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_alipay_agreements_due
@@ -657,6 +786,8 @@ CREATE INDEX IF NOT EXISTS idx_user_behavior_events_app_event_time
 ON user_behavior_events(app_id, event_name, occurred_at DESC);
 CREATE INDEX IF NOT EXISTS idx_user_behavior_events_app_route_time
 ON user_behavior_events(app_id, route_path, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_user_behavior_events_app_user_occurred_at
+ON user_behavior_events(app_id, user_id, occurred_at ASC);
 
 CREATE TABLE IF NOT EXISTS wechat_open_apps (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
