@@ -24,12 +24,6 @@ const navItems = [
     path: '/platform-admin/apps',
   },
   {
-    key: 'agents',
-    label: 'Agent',
-    desc: '平台级 Agent 与租户发布',
-    path: '/platform-admin/agents',
-  },
-  {
     key: 'login-credentials',
     label: '登录凭证',
     desc: '微信、GitHub、Google',

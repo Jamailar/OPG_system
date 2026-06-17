@@ -20,7 +20,6 @@ import OutboundProxiesPage from '@/pages/platform/OutboundProxiesPage';
 import PlatformPaymentMethodsPage from '@/pages/platform/PlatformPaymentMethodsPage';
 import PlatformSmsServicesPage from '@/pages/platform/PlatformSmsServicesPage';
 import PlatformEmailServicePage from '@/pages/platform/PlatformEmailServicePage';
-import PlatformAgentsPage from '@/pages/platform/PlatformAgentsPage';
 import PlatformRuntimeSettingsPage from '@/pages/platform/PlatformRuntimeSettingsPage';
 import PlatformObservabilityPage from '@/pages/platform/PlatformObservabilityPage';
 import PlatformLayout from '@/components/PlatformLayout';
@@ -182,14 +181,7 @@ function App() {
             <Route path="usage" element={<GlobalAiUsagePage />} />
           </Route>
 
-          <Route
-            path="/platform-admin/agents"
-            element={
-              <PlatformProtectedRoute>
-                <PlatformAgentsPage />
-              </PlatformProtectedRoute>
-            }
-          />
+          <Route path="/platform-admin/agents" element={<Navigate to="/platform-admin/dashboard" replace />} />
 
           <Route
             path="/platform-admin/proxies"
