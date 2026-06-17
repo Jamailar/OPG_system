@@ -18,19 +18,14 @@ type ApiDocsTab = 'all' | 'ai';
 type AudienceGroup = {
   key: AudienceGroupKey;
   label: string;
-  description: string;
 };
 
 type VisibleModuleGroup = {
-  group: AudienceGroup;
-  modules: Array<{
-    module_name: string;
-    module_label: string;
-    module_summary: string;
-    module_doc_path: string;
-    routes: GeneratedApiDocRoute[];
-  }>;
-  routeCount: number;
+  module_name: string;
+  module_label: string;
+  module_summary: string;
+  module_doc_path: string;
+  routes: GeneratedApiDocRoute[];
 };
 
 const AUTH_LABELS: Record<GeneratedApiRouteAuth, string> = {
@@ -62,24 +57,25 @@ const AUDIENCE_GROUPS: AudienceGroup[] = [
   {
     key: 'tenant-user',
     label: '租户用户 API',
-    description: '给当前 app 的普通用户端调用，通常需要用户 Bearer Token。',
   },
   {
     key: 'tenant-admin',
     label: '租户管理员 API',
-    description: '给当前 app 的业务管理员调用，不属于平台级管理后台接口。',
   },
   {
     key: 'public',
     label: '公开 API',
-    description: '无需登录即可调用，通常用于公开资源、公开商品、公开 agent 等能力。',
   },
   {
     key: 'compat',
     label: '兼容 API',
-    description: '兼容 OpenAI / Gemini 等协议或 SDK 的接口。',
   },
 ];
+
+const AUDIENCE_GROUP_LABELS = AUDIENCE_GROUPS.reduce(
+  (acc, group) => ({ ...acc, [group.key]: group.label }),
+  {} as Record<AudienceGroupKey, string>,
+);
 
 const AI_MODULE_NAMES = new Set(['ai-chat', 'ai-agents']);
 
@@ -372,19 +368,10 @@ export default function TenantApiDocsPanel({ app }: Props) {
 
   const docModules = useMemo(() => buildApiDocModules(), []);
 
-  const visibleGroups = useMemo<VisibleModuleGroup[]>(() => {
+  const visibleModules = useMemo<VisibleModuleGroup[]>(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    const grouped = new Map<AudienceGroupKey, VisibleModuleGroup>();
 
-    for (const group of AUDIENCE_GROUPS) {
-      grouped.set(group.key, {
-        group,
-        modules: [],
-        routeCount: 0,
-      });
-    }
-
-    docModules
+    return docModules
       .filter((module) => activeTab !== 'ai' || isAiModule(module.module_name))
       .map((module) => {
         const routes = module.routes.filter((route) => {
@@ -421,38 +408,7 @@ export default function TenantApiDocsPanel({ app }: Props) {
 
         return { ...module, routes };
       })
-      .filter((module) => module.routes.length > 0)
-      .forEach((module) => {
-        const perGroup = new Map<AudienceGroupKey, GeneratedApiDocRoute[]>();
-        module.routes.forEach((route) => {
-          const groupKey = resolveAudienceGroup(route);
-          if (!groupKey) {
-            return;
-          }
-          const current = perGroup.get(groupKey) || [];
-          current.push(route);
-          perGroup.set(groupKey, current);
-        });
-
-        for (const [groupKey, routes] of perGroup.entries()) {
-          const target = grouped.get(groupKey);
-          if (!target || !routes.length) {
-            continue;
-          }
-          target.modules.push({
-            module_name: module.module_name,
-            module_label: module.module_label,
-            module_summary: module.module_summary,
-            module_doc_path: module.module_doc_path,
-            routes,
-          });
-          target.routeCount += routes.length;
-        }
-      });
-
-    return AUDIENCE_GROUPS
-      .map((group) => grouped.get(group.key) as VisibleModuleGroup)
-      .filter((group) => group.routeCount > 0);
+      .filter((module) => module.routes.length > 0);
   }, [activeTab, authFilter, docModules, moduleFilter, query, scopeFilter]);
 
   const moduleOptions = useMemo(
@@ -466,14 +422,11 @@ export default function TenantApiDocsPanel({ app }: Props) {
   );
 
   const totalRouteCount = useMemo(
-    () => visibleGroups.reduce((sum, group) => sum + group.routeCount, 0),
-    [visibleGroups],
+    () => visibleModules.reduce((sum, module) => sum + module.routes.length, 0),
+    [visibleModules],
   );
 
-  const totalModuleCount = useMemo(
-    () => visibleGroups.reduce((sum, group) => sum + group.modules.length, 0),
-    [visibleGroups],
-  );
+  const totalModuleCount = visibleModules.length;
 
   const tenantBasePath = app?.slug ? `/${app.slug}/v1` : '/<app-slug>/v1';
   const aiChatPath = `${tenantBasePath}/ai/chat/completions`;
@@ -492,6 +445,44 @@ export default function TenantApiDocsPanel({ app }: Props) {
   const feedbackIssueAppSlugQuery = app?.slug ? encodeURIComponent(app.slug) : '<app-slug>';
   const feedbackIssueListPath = `/api/v1/platform-admin/feedback-issues?app_slug=${feedbackIssueAppSlugQuery}&status=pending&page=1&page_size=20`;
   const feedbackIssueDetailPath = '/api/v1/platform-admin/feedback-issues/<feedback_id>';
+
+  const renderFilterToolbar = () => (
+    <section className="card api-docs-filter-card">
+      <div className="platform-filter-row api-docs-filter-row">
+        <input
+          className="platform-filter-input"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="搜索模块、接口摘要、路径、处理函数"
+        />
+        <select value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)}>
+          <option value="ALL">全部模块</option>
+          {moduleOptions.map((item) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+        <select value={authFilter} onChange={(event) => setAuthFilter(event.target.value as 'ALL' | GeneratedApiRouteAuth)}>
+          <option value="ALL">全部鉴权</option>
+          <option value="public">公开</option>
+          <option value="user">用户鉴权</option>
+          <option value="admin">管理员鉴权</option>
+          <option value="api_key">兼容鉴权</option>
+        </select>
+        <select value={scopeFilter} onChange={(event) => setScopeFilter(event.target.value as 'ALL' | GeneratedApiRouteScope)}>
+          {SCOPE_FILTER_OPTIONS.map((item) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+        <div className="platform-filter-hint">
+          {totalModuleCount} 个模块 / {totalRouteCount} 个接口
+        </div>
+      </div>
+    </section>
+  );
 
   return (
     <div className="platform-page api-docs-page">
@@ -568,9 +559,11 @@ export default function TenantApiDocsPanel({ app }: Props) {
         </div>
       </section>
 
+      {renderFilterToolbar()}
+
       {activeTab === 'ai' && (
-        <section className="card api-docs-ai-card">
-          <div className="platform-section-head api-docs-module-head">
+        <details className="card api-docs-ai-card api-docs-feature-details">
+          <summary className="platform-section-head api-docs-module-head api-docs-feature-summary">
             <div>
               <h3>AI API</h3>
               <p>使用当前 app 的用户 Token 调用已启用的 AI 能力。</p>
@@ -579,7 +572,7 @@ export default function TenantApiDocsPanel({ app }: Props) {
               <span>鉴权</span>
               <code>Authorization: Bearer &lt;user-token&gt;</code>
             </div>
-          </div>
+          </summary>
 
           <div className="api-docs-route-meta">
             <div className="api-docs-meta-item">
@@ -705,12 +698,12 @@ export default function TenantApiDocsPanel({ app }: Props) {
               </pre>
             </div>
           </div>
-        </section>
+        </details>
       )}
 
       {activeTab === 'ai' && (
-        <section className="card api-docs-ai-card">
-          <div className="platform-section-head api-docs-module-head">
+        <details className="card api-docs-ai-card api-docs-feature-details">
+          <summary className="platform-section-head api-docs-module-head api-docs-feature-summary">
             <div>
               <h3>Gemini TTS</h3>
               <p>生成单人或双人语音，返回音频 URL、base64 或二进制音频。</p>
@@ -719,7 +712,7 @@ export default function TenantApiDocsPanel({ app }: Props) {
               <span>API Key</span>
               <code>Authorization: Bearer &lt;api-key&gt;</code>
             </div>
-          </div>
+          </summary>
 
           <div className="api-docs-route-meta">
             <div className="api-docs-meta-item">
@@ -795,12 +788,12 @@ export default function TenantApiDocsPanel({ app }: Props) {
               </pre>
             </div>
           </div>
-        </section>
+        </details>
       )}
 
       {activeTab === 'ai' && (
-        <section className="card api-docs-ai-card">
-          <div className="platform-section-head api-docs-module-head">
+        <details className="card api-docs-ai-card api-docs-feature-details">
+          <summary className="platform-section-head api-docs-module-head api-docs-feature-summary">
             <div>
               <h3>VideoRetalk</h3>
               <p>提交口型替换任务后，用返回的 task_id 查询生成视频。</p>
@@ -809,7 +802,7 @@ export default function TenantApiDocsPanel({ app }: Props) {
               <span>模型</span>
               <code>videoretalk</code>
             </div>
-          </div>
+          </summary>
 
           <div className="api-docs-route-meta">
             <div className="api-docs-meta-item">
@@ -865,12 +858,12 @@ export default function TenantApiDocsPanel({ app }: Props) {
               </pre>
             </div>
           </div>
-        </section>
+        </details>
       )}
 
       {activeTab === 'ai' && (
-        <section className="card api-docs-ai-card">
-          <div className="platform-section-head api-docs-module-head">
+        <details className="card api-docs-ai-card api-docs-feature-details">
+          <summary className="platform-section-head api-docs-module-head api-docs-feature-summary">
             <div>
               <h3>视频翻译</h3>
               <p>提交视频翻译任务后，用返回的 task_id 查询结果。</p>
@@ -879,7 +872,7 @@ export default function TenantApiDocsPanel({ app }: Props) {
               <span>模型</span>
               <code>aliyun-video-translation</code>
             </div>
-          </div>
+          </summary>
 
           <div className="api-docs-route-meta">
             <div className="api-docs-meta-item">
@@ -932,12 +925,12 @@ export default function TenantApiDocsPanel({ app }: Props) {
               </pre>
             </div>
           </div>
-        </section>
+        </details>
       )}
 
       {activeTab === 'all' && (
-        <section className="card">
-        <div className="platform-section-head api-docs-module-head">
+        <details className="card api-docs-feature-details">
+        <summary className="platform-section-head api-docs-module-head api-docs-feature-summary">
           <div>
             <h3>Bug issue API</h3>
             <p>使用平台设置生成的集成密钥读取、更新、评论和评审当前 app 的反馈 issue。</p>
@@ -946,7 +939,7 @@ export default function TenantApiDocsPanel({ app }: Props) {
             <span>Scope</span>
             <code>feedback:admin</code>
           </div>
-        </div>
+        </summary>
 
         <div className="api-docs-route-meta">
           <div className="api-docs-meta-item">
@@ -1012,141 +1005,95 @@ export default function TenantApiDocsPanel({ app }: Props) {
             </pre>
           </div>
         </div>
-      </section>
+      </details>
       )}
 
-      <section className="card">
-        <div className="platform-filter-row">
-          <input
-            className="platform-filter-input"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索模块、接口摘要、路径、处理函数"
-          />
-          <select value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)}>
-            <option value="ALL">全部模块</option>
-            {moduleOptions.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-          <select value={authFilter} onChange={(event) => setAuthFilter(event.target.value as 'ALL' | GeneratedApiRouteAuth)}>
-            <option value="ALL">全部鉴权</option>
-            <option value="public">公开</option>
-            <option value="user">用户鉴权</option>
-            <option value="admin">管理员鉴权</option>
-            <option value="api_key">兼容鉴权</option>
-          </select>
-          <select value={scopeFilter} onChange={(event) => setScopeFilter(event.target.value as 'ALL' | GeneratedApiRouteScope)}>
-            {SCOPE_FILTER_OPTIONS.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-          <div className="platform-filter-hint">
-            {totalModuleCount} 个模块 / {totalRouteCount} 个接口
-          </div>
-        </div>
-      </section>
-
-      {visibleGroups.map((group) => (
-        <section className="card api-docs-group-card" key={group.group.key}>
+      {visibleModules.map((module) => (
+        <section className="card api-docs-group-card" key={module.module_name}>
           <div className="platform-section-head api-docs-group-head">
             <div>
-              <h3>{group.group.label}</h3>
-              <p>{group.group.description}</p>
+              <h3>{module.module_label}</h3>
+              <p>{module.module_summary}</p>
             </div>
             <div className="api-docs-module-meta">
-              <span>{group.modules.length} 个模块</span>
-              <span>{group.routeCount} 个接口</span>
+              <span>{module.routes.length} 个接口</span>
+              <code>{module.module_doc_path}</code>
             </div>
           </div>
 
-          <div className="api-docs-group-modules">
-            {group.modules.map((module) => (
-              <section className="api-docs-module-card" key={`${group.group.key}:${module.module_name}`}>
-                <div className="platform-section-head api-docs-module-head">
-                  <div>
-                    <h3>{module.module_label}</h3>
-                    <p>{module.module_summary}</p>
+          <div className="api-docs-route-list">
+            {module.routes.map((route) => {
+              const primaryPath = resolveExamplePath(route, app);
+              const compatPaths = route.path_templates
+                .slice(1)
+                .map((template) => resolveExamplePath(route, app, template));
+              const audienceGroup = resolveAudienceGroup(route);
+              return (
+                <details className="api-docs-route-card" key={route.id}>
+                  <summary className="api-docs-route-summary">
+                    <span className="api-docs-route-head-main">
+                      <span className={`platform-method-badge method-${route.method.toLowerCase()}`}>
+                        {route.method}
+                      </span>
+                      <span className="api-docs-route-title">
+                        <strong>{route.summary || route.handler}</strong>
+                        <code>{primaryPath}</code>
+                      </span>
+                    </span>
+                    <span className="api-docs-route-badges">
+                      {audienceGroup && <span className="status-tag">{AUDIENCE_GROUP_LABELS[audienceGroup]}</span>}
+                      <span className="status-tag">{AUTH_LABELS[route.auth]}</span>
+                      <span className="status-tag">{SCOPE_LABELS[route.scope]}</span>
+                    </span>
+                  </summary>
+
+                  <div className="api-docs-route-details">
+                    <div className="api-docs-path-block">
+                      <span>主路径</span>
+                      <code>{primaryPath}</code>
+                    </div>
+
+                    {compatPaths.length > 0 && (
+                      <div className="api-docs-compat-block">
+                        <span>兼容路径</span>
+                        <div className="api-docs-compat-list">
+                          {compatPaths.map((item) => (
+                            <code key={`${route.id}:${item}`}>{item}</code>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="api-docs-route-meta">
+                      <div className="api-docs-meta-item">
+                        <span>调用说明</span>
+                        <strong>{buildUsageHint(route)}</strong>
+                      </div>
+                      <div className="api-docs-meta-item">
+                        <span>处理函数</span>
+                        <code>{route.controller_name}.{route.handler}()</code>
+                      </div>
+                      <div className="api-docs-meta-item">
+                        <span>源码位置</span>
+                        <code>{route.source_file}</code>
+                      </div>
+                    </div>
+
+                    <div className="api-docs-curl">
+                      <span>cURL 示例</span>
+                      <pre>
+                        <code>{buildCurlExample(route, app)}</code>
+                      </pre>
+                    </div>
                   </div>
-                  <div className="api-docs-module-meta">
-                    <span>{module.routes.length} 个接口</span>
-                    <code>{module.module_doc_path}</code>
-                  </div>
-                </div>
-
-                <div className="api-docs-route-list">
-                  {module.routes.map((route) => {
-                    const primaryPath = resolveExamplePath(route, app);
-                    const compatPaths = route.path_templates
-                      .slice(1)
-                      .map((template) => resolveExamplePath(route, app, template));
-                    return (
-                      <article className="api-docs-route-card" key={route.id}>
-                        <div className="api-docs-route-head">
-                          <div className="api-docs-route-head-main">
-                            <span className={`platform-method-badge method-${route.method.toLowerCase()}`}>
-                              {route.method}
-                            </span>
-                            <strong>{route.summary || route.handler}</strong>
-                          </div>
-                          <div className="api-docs-route-badges">
-                            <span className="status-tag">{AUTH_LABELS[route.auth]}</span>
-                            <span className="status-tag">{SCOPE_LABELS[route.scope]}</span>
-                          </div>
-                        </div>
-
-                        <div className="api-docs-path-block">
-                          <span>主路径</span>
-                          <code>{primaryPath}</code>
-                        </div>
-
-                        {compatPaths.length > 0 && (
-                          <div className="api-docs-compat-block">
-                            <span>兼容路径</span>
-                            <div className="api-docs-compat-list">
-                              {compatPaths.map((item) => (
-                                <code key={`${route.id}:${item}`}>{item}</code>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="api-docs-route-meta">
-                          <div className="api-docs-meta-item">
-                            <span>调用说明</span>
-                            <strong>{buildUsageHint(route)}</strong>
-                          </div>
-                          <div className="api-docs-meta-item">
-                            <span>处理函数</span>
-                            <code>{route.controller_name}.{route.handler}()</code>
-                          </div>
-                          <div className="api-docs-meta-item">
-                            <span>源码位置</span>
-                            <code>{route.source_file}</code>
-                          </div>
-                        </div>
-
-                        <div className="api-docs-curl">
-                          <span>cURL 示例</span>
-                          <pre>
-                            <code>{buildCurlExample(route, app)}</code>
-                          </pre>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </section>
-            ))}
+                </details>
+              );
+            })}
           </div>
         </section>
       ))}
 
-      {!visibleGroups.length && (
+      {!visibleModules.length && (
         <section className="card">
           <div className="loading">没有匹配的 API 文档结果。</div>
         </section>

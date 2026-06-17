@@ -2758,6 +2758,14 @@ code {
   color: var(--primary);
 }
 
+.api-docs-filter-card {
+  padding: 14px;
+}
+
+.api-docs-filter-row {
+  grid-template-columns: minmax(280px, 1fr) 180px 150px 150px auto;
+}
+
 .api-docs-ai-card {
   display: grid;
   gap: 14px;
@@ -2857,16 +2865,66 @@ code {
   border: 1px solid var(--divider);
   border-radius: var(--radius-md);
   background: #fff;
-  padding: 14px;
-  display: grid;
-  gap: 12px;
+  overflow: hidden;
 }
 
-.api-docs-route-head {
+.api-docs-route-summary {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.api-docs-route-summary::-webkit-details-marker,
+.api-docs-feature-summary::-webkit-details-marker {
+  display: none;
+}
+
+.api-docs-route-summary::after,
+.api-docs-feature-summary::after {
+  content: '+';
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(124, 58, 237, 0.08);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.api-docs-route-card[open] .api-docs-route-summary::after,
+.api-docs-feature-details[open] .api-docs-feature-summary::after {
+  content: '-';
+}
+
+.api-docs-route-card[open] .api-docs-route-summary {
+  border-bottom: 1px solid var(--divider);
+}
+
+.api-docs-route-details {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.api-docs-route-title {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.api-docs-route-title code {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .api-docs-route-head-main,
@@ -2875,6 +2933,10 @@ code {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+.api-docs-route-head-main {
+  min-width: 0;
 }
 
 .api-docs-path-block,
@@ -2937,6 +2999,21 @@ code {
   overflow-x: auto;
   font-size: 12px;
   line-height: 1.65;
+}
+
+.api-docs-feature-details {
+  display: grid;
+  gap: 14px;
+}
+
+.api-docs-feature-summary {
+  margin-bottom: 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.api-docs-feature-details[open] .api-docs-feature-summary {
+  margin-bottom: 14px;
 }
 
 .ai-center-shell {
