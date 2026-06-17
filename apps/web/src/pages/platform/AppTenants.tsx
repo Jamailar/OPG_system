@@ -285,12 +285,13 @@ export default function AppTenants() {
       </section>
 
       {formVisible && (
-        <section className="card">
-          <div className="platform-section-head">
-            <h3>{currentAction}</h3>
-          </div>
+        <div className="modal-overlay" onClick={saving ? undefined : closeForm}>
+          <section className="modal modal-lg" onClick={(event) => event.stopPropagation()}>
+            <div className="platform-section-head">
+              <h3>{currentAction}</h3>
+            </div>
 
-          <form onSubmit={handleSubmit} className="platform-form-grid">
+            <form onSubmit={handleSubmit} className="platform-form-grid">
             <div className="form-group">
               <label>应用 Slug</label>
               <input
@@ -405,8 +406,9 @@ export default function AppTenants() {
                 取消
               </button>
             </div>
-          </form>
-        </section>
+            </form>
+          </section>
+        </div>
       )}
     </div>
   );
