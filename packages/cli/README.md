@@ -32,12 +32,30 @@ opg platform apps list
 opg platform apps create --json '{"name":"Demo App","slug":"demo"}'
 opg platform runtime get
 opg platform runtime update --json '{"api_base_url":"https://opg.example.com"}'
+opg platform feedbacks list --app-id <app-id> --status open
+opg platform feedbacks get --app-id <app-id> --feedback-id <feedback-id>
+opg platform analytics users --app-id <app-id> --days 30
+opg platform ai-usage logs --app-id <app-id> --days 7
+opg platform payments orders --app-id <app-id> --page 1
 opg platform request --path /storage/providers --method GET
 ```
 
 The MCP server also exposes platform tools for app creation, runtime settings,
-storage providers, AI sources/models, and a generic `opg_platform_request`
-escape hatch for other `/api/v1/platform-admin/*` endpoints.
+storage providers, AI sources/models, app feedback, app analytics, app AI usage,
+app payment orders, and a generic `opg_platform_request` escape hatch for other
+`/api/v1/platform-admin/*` endpoints.
+
+Common app-data MCP tools:
+
+- `opg_platform_app_feedbacks_list`
+- `opg_platform_app_feedback_get`
+- `opg_platform_app_feedback_update`
+- `opg_platform_app_feedback_comment`
+- `opg_platform_app_feedback_review`
+- `opg_platform_app_analytics_overview`
+- `opg_platform_app_analytics_users`
+- `opg_platform_app_ai_usage_logs`
+- `opg_platform_app_payment_orders`
 
 ## Codex Database Tools
 

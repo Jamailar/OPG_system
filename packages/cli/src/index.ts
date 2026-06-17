@@ -209,6 +209,106 @@ async function runPlatformCommand(commandArgs: string[]) {
     }
   }
 
+  if (resource === 'feedbacks' || resource === 'feedback') {
+    const appId = requirePlatformAppId(flags);
+    if (action === 'list') {
+      printJson(await client.apps.feedbacks.list(appId, parseQueryPayload(flags)));
+      return;
+    }
+    if (action === 'get') {
+      const feedbackId = flags.feedbackId || flags['feedback-id'] || '';
+      if (!feedbackId) throw new Error('Missing feedback id. Use: opg platform feedbacks get --app-id <id> --feedback-id <id>');
+      printJson(await client.apps.feedbacks.get(appId, feedbackId));
+      return;
+    }
+    if (action === 'update') {
+      const feedbackId = flags.feedbackId || flags['feedback-id'] || '';
+      if (!feedbackId) throw new Error('Missing feedback id. Use: opg platform feedbacks update --app-id <id> --feedback-id <id> --json {...}');
+      printJson(await client.apps.feedbacks.update(appId, feedbackId, parseJsonPayload(flags)));
+      return;
+    }
+    if (action === 'comment') {
+      const feedbackId = flags.feedbackId || flags['feedback-id'] || '';
+      if (!feedbackId) throw new Error('Missing feedback id. Use: opg platform feedbacks comment --app-id <id> --feedback-id <id> --json {...}');
+      printJson(await client.apps.feedbacks.addComment(appId, feedbackId, parseJsonPayload(flags)));
+      return;
+    }
+    if (action === 'review') {
+      const feedbackId = flags.feedbackId || flags['feedback-id'] || '';
+      if (!feedbackId) throw new Error('Missing feedback id. Use: opg platform feedbacks review --app-id <id> --feedback-id <id> --json {...}');
+      printJson(await client.apps.feedbacks.review(appId, feedbackId, parseJsonPayload(flags)));
+      return;
+    }
+  }
+
+  if (resource === 'analytics') {
+    const appId = requirePlatformAppId(flags);
+    const query = parseQueryPayload(flags);
+    if (action === 'business') {
+      printJson(await client.apps.analytics.business(appId, query));
+      return;
+    }
+    if (action === 'overview') {
+      printJson(await client.apps.analytics.overview(appId, query));
+      return;
+    }
+    if (action === 'growth') {
+      printJson(await client.apps.analytics.growth(appId, query));
+      return;
+    }
+    if (action === 'retention') {
+      printJson(await client.apps.analytics.retention(appId, query));
+      return;
+    }
+    if (action === 'profiles') {
+      printJson(await client.apps.analytics.profiles(appId, query));
+      return;
+    }
+    if (action === 'conversion') {
+      printJson(await client.apps.analytics.conversion(appId, query));
+      return;
+    }
+    if (action === 'users') {
+      printJson(await client.apps.analytics.users(appId, query));
+      return;
+    }
+  }
+
+  if (resource === 'ai-usage' || resource === 'ai_usage') {
+    const appId = requirePlatformAppId(flags);
+    const query = parseQueryPayload(flags);
+    if (action === 'summary') {
+      printJson(await client.apps.aiUsage.summary(appId, query));
+      return;
+    }
+    if (action === 'breakdown') {
+      printJson(await client.apps.aiUsage.breakdown(appId, query));
+      return;
+    }
+    if (action === 'logs') {
+      printJson(await client.apps.aiUsage.logs(appId, query));
+      return;
+    }
+  }
+
+  if (resource === 'payments') {
+    const appId = requirePlatformAppId(flags);
+    if (action === 'products') {
+      printJson(await client.apps.payments.products(appId));
+      return;
+    }
+    if (action === 'orders') {
+      printJson(await client.apps.payments.orders(appId, parseQueryPayload(flags)));
+      return;
+    }
+    if (action === 'refund') {
+      const orderId = flags.orderId || flags['order-id'] || '';
+      if (!orderId) throw new Error('Missing order id. Use: opg platform payments refund --app-id <id> --order-id <id> --json {...}');
+      printJson(await client.apps.payments.refundOrder(appId, orderId, flags.json ? parseJsonPayload(flags) : {}));
+      return;
+    }
+  }
+
   if (resource === 'runtime' || resource === 'runtime-settings') {
     if (action === 'get') {
       printJson(await client.runtimeSettings.get());
@@ -283,6 +383,196 @@ async function startMcpServer() {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ appId, payload }: any) => toToolResult(await platformClient.apps.update(appId, payload)),
+  );
+
+  registerTool(
+    'opg_platform_app_feedbacks_list',
+    {
+      title: 'List OPG App Feedbacks',
+      description: 'List user feedback issues for a tenant app. Requires OPG_PLATFORM_TOKEN and app feedback permission.',
+      inputSchema: {
+        appId: z.string().min(1),
+        status: z.string().optional(),
+        priority: z.string().optional(),
+        assigneeUserId: z.string().optional(),
+        q: z.string().optional(),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(20),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appId, status, priority, assigneeUserId, q, page, pageSize }: any) => toToolResult(await platformClient.apps.feedbacks.list(appId, {
+      status,
+      priority,
+      assignee_user_id: assigneeUserId,
+      q,
+      page,
+      page_size: pageSize,
+    })),
+  );
+
+  registerTool(
+    'opg_platform_app_feedback_get',
+    {
+      title: 'Get OPG App Feedback',
+      description: 'Read one user feedback issue with comments for a tenant app.',
+      inputSchema: {
+        appId: z.string().min(1),
+        feedbackId: z.string().min(1),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appId, feedbackId }: any) => toToolResult(await platformClient.apps.feedbacks.get(appId, feedbackId)),
+  );
+
+  registerTool(
+    'opg_platform_app_feedback_update',
+    {
+      title: 'Update OPG App Feedback',
+      description: 'Update status, priority, assignee, title, or admin metadata for one tenant app feedback issue.',
+      inputSchema: {
+        appId: z.string().min(1),
+        feedbackId: z.string().min(1),
+        payload: z.record(z.unknown()),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ appId, feedbackId, payload }: any) => toToolResult(await platformClient.apps.feedbacks.update(appId, feedbackId, payload)),
+  );
+
+  registerTool(
+    'opg_platform_app_feedback_comment',
+    {
+      title: 'Comment On OPG App Feedback',
+      description: 'Add an internal or public admin comment to a tenant app feedback issue.',
+      inputSchema: {
+        appId: z.string().min(1),
+        feedbackId: z.string().min(1),
+        body: z.string().min(1),
+        isInternal: z.boolean().default(true),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ appId, feedbackId, body, isInternal }: any) => toToolResult(await platformClient.apps.feedbacks.addComment(appId, feedbackId, {
+      body,
+      is_internal: isInternal,
+    })),
+  );
+
+  registerTool(
+    'opg_platform_app_feedback_review',
+    {
+      title: 'Review OPG App Feedback',
+      description: 'Apply a feedback review action such as useful, thanks, or invalid.',
+      inputSchema: {
+        appId: z.string().min(1),
+        feedbackId: z.string().min(1),
+        action: z.string().min(1),
+        note: z.string().optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ appId, feedbackId, action, note }: any) => toToolResult(await platformClient.apps.feedbacks.review(appId, feedbackId, { action, note })),
+  );
+
+  registerTool(
+    'opg_platform_app_analytics_overview',
+    {
+      title: 'Get OPG App Analytics Overview',
+      description: 'Read tenant app user analytics overview.',
+      inputSchema: {
+        appId: z.string().min(1),
+        days: z.number().int().min(1).max(365).optional(),
+        from: z.string().optional(),
+        to: z.string().optional(),
+        timezone: z.string().optional(),
+        granularity: z.string().optional(),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appId, days, from, to, timezone, granularity }: any) => toToolResult(await platformClient.apps.analytics.overview(appId, {
+      days,
+      from,
+      to,
+      timezone,
+      granularity,
+    })),
+  );
+
+  registerTool(
+    'opg_platform_app_analytics_users',
+    {
+      title: 'List OPG App Analytics Users',
+      description: 'Read tenant app user analytics detail rows.',
+      inputSchema: {
+        appId: z.string().min(1),
+        days: z.number().int().min(1).max(365).optional(),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(20),
+        segment: z.string().optional(),
+        source: z.string().optional(),
+        paidStatus: z.string().optional(),
+        accountStatus: z.string().optional(),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appId, days, page, pageSize, segment, source, paidStatus, accountStatus }: any) => toToolResult(await platformClient.apps.analytics.users(appId, {
+      days,
+      page,
+      page_size: pageSize,
+      segment,
+      source,
+      paid_status: paidStatus,
+      account_status: accountStatus,
+    })),
+  );
+
+  registerTool(
+    'opg_platform_app_ai_usage_logs',
+    {
+      title: 'List OPG App AI Usage Logs',
+      description: 'Read tenant app AI usage logs with cost and points data.',
+      inputSchema: {
+        appId: z.string().min(1),
+        days: z.number().int().min(1).max(365).optional(),
+        capability: z.string().optional(),
+        modelKey: z.string().optional(),
+        success: z.boolean().optional(),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(20),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appId, days, capability, modelKey, success, page, pageSize }: any) => toToolResult(await platformClient.apps.aiUsage.logs(appId, {
+      days,
+      capability,
+      model_key: modelKey,
+      success,
+      page,
+      page_size: pageSize,
+    })),
+  );
+
+  registerTool(
+    'opg_platform_app_payment_orders',
+    {
+      title: 'List OPG App Payment Orders',
+      description: 'Read tenant app payment orders.',
+      inputSchema: {
+        appId: z.string().min(1),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(20),
+        status: z.string().optional(),
+        q: z.string().optional(),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appId, page, pageSize, status, q }: any) => toToolResult(await platformClient.apps.payments.orders(appId, {
+      page,
+      page_size: pageSize,
+      status,
+      q,
+    })),
   );
 
   registerTool(
@@ -706,6 +996,53 @@ function parseJsonPayload(flags: Record<string, string>) {
     throw new Error('Missing JSON payload. Use --json \'{"name":"Demo","slug":"demo"}\'.');
   }
   return JSON.parse(raw);
+}
+
+function parseQueryPayload(flags: Record<string, string>): Record<string, string | number | boolean | null> {
+  if (flags.query) {
+    return JSON.parse(flags.query);
+  }
+  const ignored = new Set([
+    'app-id',
+    'appId',
+    'base-url',
+    'baseUrl',
+    'api-key',
+    'apiKey',
+    'platform-token',
+    'platformToken',
+    'feedback-id',
+    'feedbackId',
+    'order-id',
+    'orderId',
+    'json',
+    'body',
+    'method',
+    'path',
+  ]);
+  const query: Record<string, string | number | boolean | null> = {};
+  for (const [key, rawValue] of Object.entries(flags)) {
+    if (ignored.has(key)) continue;
+    query[key.replace(/-/g, '_')] = parseScalar(rawValue);
+  }
+  return query;
+}
+
+function parseScalar(value: string): string | number | boolean | null {
+  const normalized = String(value ?? '').trim();
+  if (normalized === 'true') return true;
+  if (normalized === 'false') return false;
+  if (normalized === 'null') return null;
+  if (/^-?\d+(\.\d+)?$/.test(normalized)) return Number(normalized);
+  return normalized;
+}
+
+function requirePlatformAppId(flags: Record<string, string>) {
+  const appId = flags.appId || flags['app-id'] || '';
+  if (!appId) {
+    throw new Error('Missing app id. Use --app-id <id>.');
+  }
+  return appId;
 }
 
 function parseFlags(commandArgs: string[]) {

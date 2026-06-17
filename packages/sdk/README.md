@@ -62,6 +62,38 @@ await platform.storageProviders.create({
 `createOpgClient()` also exposes `opg.platform` for processes that need both
 app-scoped API calls and platform administration.
 
+## App Data Through Platform Admin
+
+Reading or managing app data uses the platform token because these are admin
+operations over a tenant app:
+
+```ts
+const feedbacks = await platform.apps.feedbacks.list(appId, {
+  status: "open",
+  page: 1,
+  page_size: 20,
+});
+
+const feedback = await platform.apps.feedbacks.get(appId, feedbackId);
+
+await platform.apps.feedbacks.update(appId, feedbackId, {
+  status: "in_progress",
+  priority: "high",
+});
+
+await platform.apps.feedbacks.addComment(appId, feedbackId, {
+  body: "已收到，正在处理",
+  is_internal: false,
+});
+
+const users = await platform.apps.analytics.users(appId, { days: 30 });
+const aiLogs = await platform.apps.aiUsage.logs(appId, { days: 7 });
+const orders = await platform.apps.payments.orders(appId, { page: 1 });
+```
+
+Available app data namespaces include `feedbacks`, `analytics`, `aiUsage`,
+`payments`, `email`, `site`, `redeem`, and `admins`.
+
 ## Database Workspace
 
 Database operations are routed through the OPG backend. The SDK never exposes

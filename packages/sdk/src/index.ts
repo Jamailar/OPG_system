@@ -58,6 +58,8 @@ type OpgCrudClient = {
   test?(idOrInput: string | Record<string, unknown>, input?: Record<string, unknown>): Promise<Record<string, unknown>>;
 };
 
+type OpgQuery = Record<string, string | number | boolean | undefined | null>;
+
 export type OpgPlatformClient = {
   request<T = unknown>(path: string, options?: OpgRequestOptions): Promise<T>;
   apps: {
@@ -74,6 +76,76 @@ export type OpgPlatformClient = {
       defaultModels(appId: string): Promise<Record<string, unknown>>;
       setDefaultModel(appId: string, capability: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
       deleteDefaultModel(appId: string, capability: string): Promise<Record<string, unknown>>;
+    };
+    feedbacks: {
+      list(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      get(appId: string, feedbackId: string): Promise<Record<string, unknown>>;
+      update(appId: string, feedbackId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      addComment(appId: string, feedbackId: string, input: { body?: string; is_internal?: boolean }): Promise<Record<string, unknown>>;
+      review(appId: string, feedbackId: string, input: { action?: string; note?: string }): Promise<Record<string, unknown>>;
+    };
+    analytics: {
+      business(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      overview(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      growth(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      retention(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      profiles(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      conversion(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      users(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+    };
+    aiUsage: {
+      summary(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      breakdown(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      logs(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+    };
+    payments: {
+      products(appId: string): Promise<Record<string, unknown>>;
+      orders(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      refundOrder(appId: string, orderId: string, input?: Record<string, unknown>): Promise<Record<string, unknown>>;
+    };
+    email: {
+      settings(appId: string): Promise<Record<string, unknown>>;
+      updateSettings(appId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      contacts(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      importContacts(appId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      updateContact(appId: string, contactId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      templates(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      createTemplate(appId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      updateTemplate(appId: string, templateId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      campaigns(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      createCampaign(appId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      sendCampaignTest(appId: string, campaignId: string, input?: Record<string, unknown>): Promise<Record<string, unknown>>;
+      scheduleCampaign(appId: string, campaignId: string, input?: Record<string, unknown>): Promise<Record<string, unknown>>;
+      cancelCampaign(appId: string, campaignId: string): Promise<Record<string, unknown>>;
+      campaignRecipients(appId: string, campaignId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+    };
+    site: {
+      messages(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      updateMessage(appId: string, messageId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      cookieConsents(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+    };
+    redeem: {
+      packages(appId: string): Promise<Record<string, unknown>>;
+      createPackage(appId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      updatePackage(appId: string, packageId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      deletePackage(appId: string, packageId: string): Promise<Record<string, unknown>>;
+      distributePackage(appId: string, packageId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      createCodeBatch(appId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      codes(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      redemptions(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      revokeRedemption(appId: string, redemptionId: string, input?: Record<string, unknown>): Promise<Record<string, unknown>>;
+      batches(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      batchText(appId: string, batchId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      voidCode(appId: string, code: string, input?: Record<string, unknown>): Promise<Record<string, unknown>>;
+    };
+    admins: {
+      list(appId: string): Promise<Record<string, unknown>>;
+      myPermissions(appId: string): Promise<Record<string, unknown>>;
+      create(appId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      setPassword(appId: string, adminUserId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      updatePermissions(appId: string, adminUserId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      updateStatus(appId: string, adminUserId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      remove(appId: string, adminUserId: string): Promise<Record<string, unknown>>;
     };
   };
   runtimeSettings: {
@@ -119,9 +191,9 @@ export type OpgPlatformClient = {
     sources: OpgCrudClient;
     providerTemplates(): Promise<Record<string, unknown>>;
     gatewayRuntime(): Promise<Record<string, unknown>>;
-    providerHealth(query?: Record<string, string | number | boolean | undefined | null>): Promise<Record<string, unknown>>;
-    requestEvents(query?: Record<string, string | number | boolean | undefined | null>): Promise<Record<string, unknown>>;
-    auditEvents(query?: Record<string, string | number | boolean | undefined | null>): Promise<Record<string, unknown>>;
+    providerHealth(query?: OpgQuery): Promise<Record<string, unknown>>;
+    requestEvents(query?: OpgQuery): Promise<Record<string, unknown>>;
+    auditEvents(query?: OpgQuery): Promise<Record<string, unknown>>;
     models: OpgCrudClient & {
       sourceRoutes(modelId: string): Promise<Record<string, unknown>>;
       replaceSourceRoutes(modelId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
@@ -129,9 +201,9 @@ export type OpgPlatformClient = {
       playground(input: Record<string, unknown>): Promise<Record<string, unknown>>;
       queryPlaygroundTask(input: Record<string, unknown>): Promise<Record<string, unknown>>;
     };
-    usageSummary(query?: Record<string, string | number | boolean | undefined | null>): Promise<Record<string, unknown>>;
-    usageBreakdown(query?: Record<string, string | number | boolean | undefined | null>): Promise<Record<string, unknown>>;
-    usageLogs(query?: Record<string, string | number | boolean | undefined | null>): Promise<Record<string, unknown>>;
+    usageSummary(query?: OpgQuery): Promise<Record<string, unknown>>;
+    usageBreakdown(query?: OpgQuery): Promise<Record<string, unknown>>;
+    usageLogs(query?: OpgQuery): Promise<Record<string, unknown>>;
   };
 };
 
@@ -325,6 +397,7 @@ export function createOpgPlatformClient(options: OpgClientOptions): OpgPlatformC
   });
 
   const appsBase = '/apps';
+  const appPath = (appId: string, path = '') => `${appsBase}/${encodeURIComponent(appId)}${path}`;
   const aiModels = crud('/ai/models');
   const aiSources = crud('/ai/sources');
 
@@ -341,18 +414,106 @@ export function createOpgPlatformClient(options: OpgClientOptions): OpgPlatformC
       update: (appId, input) => request(`${appsBase}/${encodeURIComponent(appId)}`, { method: 'PUT', body: input }),
       stats: (appId) => request(`${appsBase}/${encodeURIComponent(appId)}/stats`),
       ai: {
-        modelRoutes: (appId) => request(`${appsBase}/${encodeURIComponent(appId)}/ai/model-routes`),
+        modelRoutes: (appId) => request(appPath(appId, '/ai/model-routes')),
         upsertModelRoute: (appId, modelId, input) =>
-          request(`${appsBase}/${encodeURIComponent(appId)}/ai/model-routes/${encodeURIComponent(modelId)}`, { method: 'PUT', body: input }),
+          request(appPath(appId, `/ai/model-routes/${encodeURIComponent(modelId)}`), { method: 'PUT', body: input }),
         deleteModelRoute: (appId, modelId) =>
-          request(`${appsBase}/${encodeURIComponent(appId)}/ai/model-routes/${encodeURIComponent(modelId)}`, { method: 'DELETE' }),
+          request(appPath(appId, `/ai/model-routes/${encodeURIComponent(modelId)}`), { method: 'DELETE' }),
         setModelVisibility: (appId, modelId, input) =>
-          request(`${appsBase}/${encodeURIComponent(appId)}/ai/model-visibility/${encodeURIComponent(modelId)}`, { method: 'PUT', body: input }),
-        defaultModels: (appId) => request(`${appsBase}/${encodeURIComponent(appId)}/ai/default-models`),
+          request(appPath(appId, `/ai/model-visibility/${encodeURIComponent(modelId)}`), { method: 'PUT', body: input }),
+        defaultModels: (appId) => request(appPath(appId, '/ai/default-models')),
         setDefaultModel: (appId, capability, input) =>
-          request(`${appsBase}/${encodeURIComponent(appId)}/ai/default-models/${encodeURIComponent(capability)}`, { method: 'PUT', body: input }),
+          request(appPath(appId, `/ai/default-models/${encodeURIComponent(capability)}`), { method: 'PUT', body: input }),
         deleteDefaultModel: (appId, capability) =>
-          request(`${appsBase}/${encodeURIComponent(appId)}/ai/default-models/${encodeURIComponent(capability)}`, { method: 'DELETE' }),
+          request(appPath(appId, `/ai/default-models/${encodeURIComponent(capability)}`), { method: 'DELETE' }),
+      },
+      feedbacks: {
+        list: (appId, query) => request(appPath(appId, '/feedbacks'), { query }),
+        get: (appId, feedbackId) => request(appPath(appId, `/feedbacks/${encodeURIComponent(feedbackId)}`)),
+        update: (appId, feedbackId, input) => request(appPath(appId, `/feedbacks/${encodeURIComponent(feedbackId)}`), { method: 'PATCH', body: input }),
+        addComment: (appId, feedbackId, input) =>
+          request(appPath(appId, `/feedbacks/${encodeURIComponent(feedbackId)}/comments`), { method: 'POST', body: input }),
+        review: (appId, feedbackId, input) =>
+          request(appPath(appId, `/feedbacks/${encodeURIComponent(feedbackId)}/review`), { method: 'POST', body: input }),
+      },
+      analytics: {
+        business: (appId, query) => request(appPath(appId, '/business-analytics'), { query }),
+        overview: (appId, query) => request(appPath(appId, '/analytics/overview'), { query }),
+        growth: (appId, query) => request(appPath(appId, '/analytics/growth'), { query }),
+        retention: (appId, query) => request(appPath(appId, '/analytics/retention'), { query }),
+        profiles: (appId, query) => request(appPath(appId, '/analytics/profiles'), { query }),
+        conversion: (appId, query) => request(appPath(appId, '/analytics/conversion'), { query }),
+        users: (appId, query) => request(appPath(appId, '/analytics/users'), { query }),
+      },
+      aiUsage: {
+        summary: (appId, query) => request(appPath(appId, '/ai/usage/summary'), { query }),
+        breakdown: (appId, query) => request(appPath(appId, '/ai/usage/breakdown'), { query }),
+        logs: (appId, query) => request(appPath(appId, '/ai/usage/logs'), { query }),
+      },
+      payments: {
+        products: (appId) => request(`/payments/apps/${encodeURIComponent(appId)}/products`),
+        orders: (appId, query) => request(appPath(appId, '/payments/orders'), { query }),
+        refundOrder: (appId, orderId, input = {}) =>
+          request(appPath(appId, `/payments/orders/${encodeURIComponent(orderId)}/refund`), { method: 'POST', body: input }),
+      },
+      email: {
+        settings: (appId) => request(appPath(appId, '/email/settings')),
+        updateSettings: (appId, input) => request(appPath(appId, '/email/settings'), { method: 'PUT', body: input }),
+        contacts: (appId, query) => request(appPath(appId, '/email/contacts'), { query }),
+        importContacts: (appId, input) => request(appPath(appId, '/email/contacts/import'), { method: 'POST', body: input }),
+        updateContact: (appId, contactId, input) =>
+          request(appPath(appId, `/email/contacts/${encodeURIComponent(contactId)}`), { method: 'PATCH', body: input }),
+        templates: (appId, query) => request(appPath(appId, '/email/templates'), { query }),
+        createTemplate: (appId, input) => request(appPath(appId, '/email/templates'), { method: 'POST', body: input }),
+        updateTemplate: (appId, templateId, input) =>
+          request(appPath(appId, `/email/templates/${encodeURIComponent(templateId)}`), { method: 'PATCH', body: input }),
+        campaigns: (appId, query) => request(appPath(appId, '/email/campaigns'), { query }),
+        createCampaign: (appId, input) => request(appPath(appId, '/email/campaigns'), { method: 'POST', body: input }),
+        sendCampaignTest: (appId, campaignId, input = {}) =>
+          request(appPath(appId, `/email/campaigns/${encodeURIComponent(campaignId)}/send-test`), { method: 'POST', body: input }),
+        scheduleCampaign: (appId, campaignId, input = {}) =>
+          request(appPath(appId, `/email/campaigns/${encodeURIComponent(campaignId)}/schedule`), { method: 'POST', body: input }),
+        cancelCampaign: (appId, campaignId) =>
+          request(appPath(appId, `/email/campaigns/${encodeURIComponent(campaignId)}/cancel`), { method: 'POST', body: {} }),
+        campaignRecipients: (appId, campaignId, query) =>
+          request(appPath(appId, `/email/campaigns/${encodeURIComponent(campaignId)}/recipients`), { query }),
+      },
+      site: {
+        messages: (appId, query) => request(appPath(appId, '/site/messages'), { query }),
+        updateMessage: (appId, messageId, input) =>
+          request(appPath(appId, `/site/messages/${encodeURIComponent(messageId)}`), { method: 'PATCH', body: input }),
+        cookieConsents: (appId, query) => request(appPath(appId, '/site/cookie-consents'), { query }),
+      },
+      redeem: {
+        packages: (appId) => request(appPath(appId, '/redeem/packages')),
+        createPackage: (appId, input) => request(appPath(appId, '/redeem/packages'), { method: 'POST', body: input }),
+        updatePackage: (appId, packageId, input) =>
+          request(appPath(appId, `/redeem/packages/${encodeURIComponent(packageId)}`), { method: 'PUT', body: input }),
+        deletePackage: (appId, packageId) =>
+          request(appPath(appId, `/redeem/packages/${encodeURIComponent(packageId)}`), { method: 'DELETE' }),
+        distributePackage: (appId, packageId, input) =>
+          request(appPath(appId, `/redeem/packages/${encodeURIComponent(packageId)}/distribute`), { method: 'POST', body: input }),
+        createCodeBatch: (appId, input) => request(appPath(appId, '/redeem/codes/batches'), { method: 'POST', body: input }),
+        codes: (appId, query) => request(appPath(appId, '/redeem/codes'), { query }),
+        redemptions: (appId, query) => request(appPath(appId, '/redeem/redemptions'), { query }),
+        revokeRedemption: (appId, redemptionId, input = {}) =>
+          request(appPath(appId, `/redeem/redemptions/${encodeURIComponent(redemptionId)}/revoke`), { method: 'POST', body: input }),
+        batches: (appId, query) => request(appPath(appId, '/redeem/codes/batches'), { query }),
+        batchText: (appId, batchId, query) => request(appPath(appId, `/redeem/codes/batches/${encodeURIComponent(batchId)}/txt`), { query }),
+        voidCode: (appId, code, input = {}) =>
+          request(appPath(appId, `/redeem/codes/${encodeURIComponent(code)}/void`), { method: 'POST', body: input }),
+      },
+      admins: {
+        list: (appId) => request(appPath(appId, '/admins')),
+        myPermissions: (appId) => request(appPath(appId, '/admin-permissions/me')),
+        create: (appId, input) => request(appPath(appId, '/admins'), { method: 'POST', body: input }),
+        setPassword: (appId, adminUserId, input) =>
+          request(appPath(appId, `/admins/${encodeURIComponent(adminUserId)}/password`), { method: 'PUT', body: input }),
+        updatePermissions: (appId, adminUserId, input) =>
+          request(appPath(appId, `/admins/${encodeURIComponent(adminUserId)}/permissions`), { method: 'PATCH', body: input }),
+        updateStatus: (appId, adminUserId, input) =>
+          request(appPath(appId, `/admins/${encodeURIComponent(adminUserId)}/status`), { method: 'PATCH', body: input }),
+        remove: (appId, adminUserId) => request(appPath(appId, `/admins/${encodeURIComponent(adminUserId)}`), { method: 'DELETE' }),
       },
     },
     runtimeSettings: {
