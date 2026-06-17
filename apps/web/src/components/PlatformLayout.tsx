@@ -54,6 +54,12 @@ const navItems = [
     path: '/platform-admin/email',
   },
   {
+    key: 'storage',
+    label: '对象存储',
+    desc: 'OSS、S3 与 R2',
+    path: '/platform-admin/storage',
+  },
+  {
     key: 'settings',
     label: '平台设置',
     desc: '域名、CORS 与运行参数',

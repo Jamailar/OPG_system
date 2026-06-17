@@ -20,6 +20,7 @@ import OutboundProxiesPage from '@/pages/platform/OutboundProxiesPage';
 import PlatformPaymentMethodsPage from '@/pages/platform/PlatformPaymentMethodsPage';
 import PlatformSmsServicesPage from '@/pages/platform/PlatformSmsServicesPage';
 import PlatformEmailServicePage from '@/pages/platform/PlatformEmailServicePage';
+import PlatformStorageSettingsPage from '@/pages/platform/PlatformStorageSettingsPage';
 import PlatformRuntimeSettingsPage from '@/pages/platform/PlatformRuntimeSettingsPage';
 import PlatformObservabilityPage from '@/pages/platform/PlatformObservabilityPage';
 import PlatformLayout from '@/components/PlatformLayout';
@@ -228,6 +229,15 @@ function App() {
             element={
               <PlatformProtectedRoute>
                 <PlatformEmailServicePage />
+              </PlatformProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/platform-admin/storage"
+            element={
+              <PlatformProtectedRoute>
+                <PlatformStorageSettingsPage />
               </PlatformProtectedRoute>
             }
           />
