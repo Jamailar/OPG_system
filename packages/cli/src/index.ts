@@ -375,8 +375,9 @@ async function runAppCommand(commandArgs: string[]) {
 
 async function runPlatformCommand(commandArgs: string[]) {
   const resource = commandArgs[0] || 'apps';
-  const action = commandArgs[1] || 'list';
-  const flags = parseFlags(commandArgs.slice(2));
+  const isGenericRequest = resource === 'request';
+  const action = isGenericRequest ? 'call' : commandArgs[1] || 'list';
+  const flags = parseFlags(commandArgs.slice(isGenericRequest ? 1 : 2));
   const client = await getPlatformClientFromLocalConfigWithFlagOverrides(flags);
 
   if (resource === 'apps') {
