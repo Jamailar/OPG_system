@@ -1,11 +1,74 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { PlatformAppItem, PlatformObservabilityRuntime, platformApi } from '@/lib/api';
+import {
+  PlatformAiModelItem,
+  PlatformAiUsageDailyItem,
+  PlatformAiUsageSummary,
+  PlatformAppItem,
+  PlatformObservabilityRuntime,
+  platformApi,
+} from '@/lib/api';
 import { pickApiData, pickApiErrorMessage } from '@/lib/api-response';
+
+type OverviewMetric = {
+  key: string;
+  label: string;
+  value: string;
+  trend: number | null;
+};
+
+function formatInteger(value: number) {
+  return new Intl.NumberFormat('en-US').format(Math.max(0, Math.round(Number(value) || 0)));
+}
+
+function formatCurrency(value: number) {
+  return Number(value || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function getDateKey(value?: string | null) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function calculateDailyGrowth(total: number, itemsCreatedToday: number) {
+  const previousTotal = total - itemsCreatedToday;
+  if (previousTotal <= 0) return itemsCreatedToday > 0 ? 100 : 0;
+  return (itemsCreatedToday / previousTotal) * 100;
+}
+
+function calculateChange(current: number, previous: number) {
+  if (previous <= 0) return current > 0 ? 100 : 0;
+  return ((current - previous) / previous) * 100;
+}
+
+function getLatestDailyUsage(summary: PlatformAiUsageSummary | null) {
+  const daily = summary?.daily || [];
+  const today = daily[daily.length - 1] || null;
+  const previous = daily.length > 1 ? daily[daily.length - 2] : null;
+  return { today, previous };
+}
+
+function renderTrend(trend: number | null) {
+  if (trend === null || !Number.isFinite(trend)) return null;
+  const rounded = Math.round(Math.abs(trend));
+  const tone = trend < 0 ? 'negative' : trend > 0 ? 'positive' : 'neutral';
+  const arrow = trend < 0 ? '↓' : trend > 0 ? '↑' : '→';
+  return <span className={`platform-overview-metric-trend ${tone}`}>{arrow} {rounded}%</span>;
+}
 
 export default function PlatformDashboard() {
   const [loading, setLoading] = useState(false);
   const [apps, setApps] = useState<PlatformAppItem[]>([]);
+  const [aiModels, setAiModels] = useState<PlatformAiModelItem[]>([]);
+  const [aiUsage, setAiUsage] = useState<PlatformAiUsageSummary | null>(null);
   const [observability, setObservability] = useState<PlatformObservabilityRuntime | null>(null);
   const [error, setError] = useState('');
 
@@ -13,12 +76,17 @@ export default function PlatformDashboard() {
     setLoading(true);
     setError('');
     try {
-      const [appsPayload, observabilityPayload] = await Promise.all([
+      const [appsPayload, aiModelsPayload, aiUsagePayload, observabilityPayload] = await Promise.all([
         platformApi.listApps(true),
+        platformApi.listGlobalAiModels().catch(() => null),
+        platformApi.getGlobalAiUsageSummary({ days: 2 }).catch(() => null),
         platformApi.getPlatformObservabilityRuntime().catch(() => null),
       ]);
       const nextApps = pickApiData<{ items: PlatformAppItem[] }>(appsPayload);
       setApps(nextApps?.items || []);
+      const nextAiModels = aiModelsPayload ? pickApiData<{ items: PlatformAiModelItem[] }>(aiModelsPayload) : null;
+      setAiModels(nextAiModels?.items || []);
+      setAiUsage(aiUsagePayload ? pickApiData<PlatformAiUsageSummary>(aiUsagePayload) : null);
       setObservability(observabilityPayload ? pickApiData<PlatformObservabilityRuntime>(observabilityPayload) : null);
     } catch (e: any) {
       setError(pickApiErrorMessage(e, '加载平台数据失败'));
@@ -56,6 +124,44 @@ export default function PlatformDashboard() {
     return { events, failures, slow, activeModules };
   }, [observability]);
 
+  const overviewMetrics = useMemo<OverviewMetric[]>(() => {
+    const todayKey = getDateKey(new Date().toISOString());
+    const appsCreatedToday = apps.filter((item) => getDateKey(item.created_at) === todayKey).length;
+    const modelsCreatedToday = aiModels.filter((item) => getDateKey(item.created_at) === todayKey).length;
+    const { today, previous }: { today: PlatformAiUsageDailyItem | null; previous: PlatformAiUsageDailyItem | null } = getLatestDailyUsage(aiUsage);
+    const todayCalls = Number(today?.requests_total || 0);
+    const previousCalls = Number(previous?.requests_total || 0);
+    const todayCost = Number(today?.total_cost_rmb || 0);
+    const previousCost = Number(previous?.total_cost_rmb || 0);
+
+    return [
+      {
+        key: 'apps',
+        label: '应用数量',
+        value: formatInteger(stats.total),
+        trend: calculateDailyGrowth(stats.total, appsCreatedToday),
+      },
+      {
+        key: 'models',
+        label: '模型接入',
+        value: formatInteger(aiModels.length),
+        trend: calculateDailyGrowth(aiModels.length, modelsCreatedToday),
+      },
+      {
+        key: 'calls',
+        label: '今日调用',
+        value: formatInteger(todayCalls),
+        trend: calculateChange(todayCalls, previousCalls),
+      },
+      {
+        key: 'cost',
+        label: '今日费用 (¥)',
+        value: formatCurrency(todayCost),
+        trend: calculateChange(todayCost, previousCost),
+      },
+    ];
+  }, [aiModels, aiUsage, apps, stats.total]);
+
   return (
     <div className="platform-page">
       <div className="platform-page-head">
@@ -70,23 +176,16 @@ export default function PlatformDashboard() {
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      <div className="platform-stats-grid">
-        <div className="platform-stat-card">
-          <span>租户总数</span>
-          <strong>{stats.total}</strong>
-        </div>
-        <div className="platform-stat-card">
-          <span>启用应用</span>
-          <strong>{stats.active}</strong>
-        </div>
-        <div className="platform-stat-card">
-          <span>停用应用</span>
-          <strong>{stats.inactive}</strong>
-        </div>
-        <div className="platform-stat-card">
-          <span>已配置域名</span>
-          <strong>{stats.totalDomains}</strong>
-        </div>
+      <div className="platform-overview-metrics">
+        {overviewMetrics.map((item) => (
+          <article className="platform-overview-metric-card" key={item.key}>
+            <span>{item.label}</span>
+            <div className="platform-overview-metric-value">
+              <strong>{item.value}</strong>
+              {renderTrend(item.trend)}
+            </div>
+          </article>
+        ))}
       </div>
 
       <div className="platform-grid-two">

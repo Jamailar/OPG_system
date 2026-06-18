@@ -870,6 +870,70 @@ code {
   font-variant-numeric: tabular-nums;
 }
 
+.platform-overview-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.platform-overview-metric-card {
+  min-height: 168px;
+  border: 1px solid rgba(226, 232, 240, 0.88);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  padding: 28px;
+  display: grid;
+  align-content: space-between;
+  box-shadow: 0 18px 46px rgba(39, 20, 93, 0.05);
+}
+
+.platform-overview-metric-card > span {
+  color: #8a8fa6;
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.platform-overview-metric-value {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  min-width: 0;
+}
+
+.platform-overview-metric-value strong {
+  min-width: 0;
+  color: #070b22;
+  font-size: 46px;
+  line-height: 1;
+  font-weight: 850;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.platform-overview-metric-trend {
+  flex: 0 0 auto;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 850;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.platform-overview-metric-trend.positive {
+  color: #12a866;
+}
+
+.platform-overview-metric-trend.negative {
+  color: #ec4070;
+}
+
+.platform-overview-metric-trend.neutral {
+  color: #8a8fa6;
+}
+
 .platform-card {
   background: var(--bg-secondary);
   border: 1px solid var(--divider);
