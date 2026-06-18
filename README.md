@@ -459,3 +459,9 @@ OPG_BASE_URL=https://api.example.com OPG_APP_SLUG=your-app OPG_API_KEY=opg_dev_x
 - UI 加法保持克制，优先复用现有页面和组件。
 - 所有跨模块行为必须先落协议，再落实现。
 - 密钥、构建产物、依赖目录不提交。
+
+## 友情链接
+
+- [LinuxDo](https://linux.do)
+- [Jamailar](https://github.com/Jamailar)
+- [taichuy/1flowbase](https://github.com/taichuy/1flowbase)
