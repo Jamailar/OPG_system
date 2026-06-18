@@ -2,7 +2,7 @@
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import type { AddressInfo, Socket } from 'node:net';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -1503,6 +1503,7 @@ async function createLocalCallbackServer(timeoutMs: number): Promise<{
   let timeout: NodeJS.Timeout | null = null;
   let settle: (value: { state: string; code: string }) => void = () => undefined;
   let reject: (reason: unknown) => void = () => undefined;
+  const sockets = new Set<Socket>();
 
   const wait = new Promise<{ state: string; code: string }>((resolve, rejectPromise) => {
     settle = resolve;
@@ -1515,19 +1516,26 @@ async function createLocalCallbackServer(timeoutMs: number): Promise<{
       const state = requestUrl.searchParams.get('state') || '';
       const code = requestUrl.searchParams.get('code') || '';
       if (!state || !code) {
-        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.shouldKeepAlive = false;
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8', Connection: 'close' });
         res.end('Missing SDK login code.');
         reject(new Error('Missing SDK login code.'));
         return;
       }
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.shouldKeepAlive = false;
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', Connection: 'close' });
       res.end('<!doctype html><title>OPG SDK Login</title><p>OPG SDK login complete. You can close this window.</p>');
       settle({ state, code });
     } catch (error) {
-      res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.shouldKeepAlive = false;
+      res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8', Connection: 'close' });
       res.end('SDK login callback failed.');
       reject(error);
     }
+  });
+  server.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
   });
 
   await new Promise<void>((resolve, rejectListen) => {
@@ -1549,6 +1557,12 @@ async function createLocalCallbackServer(timeoutMs: number): Promise<{
         clearTimeout(timeout);
       }
       server?.close();
+      server?.closeIdleConnections?.();
+      server?.closeAllConnections?.();
+      for (const socket of sockets) {
+        socket.destroy();
+      }
+      sockets.clear();
     },
   };
 }
