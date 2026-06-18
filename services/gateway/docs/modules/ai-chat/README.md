@@ -59,12 +59,6 @@
 | POST | `videos/generations` | `videoGeneration()` |
 | POST | `videos/generations/async` | `videoGenerationAsync()` |
 | POST | `videos/generations/tasks/query` | `queryVideoTask()` |
-| POST | `video-translation/jobs` | `submitVideoTranslationJob()` |
-| POST | `video-translation/jobs/query` | `queryVideoTranslationJob()` |
-| GET | `video-translation/jobs/:task_id` | `getVideoTranslationJob()` |
-| POST | `video-retalk/jobs` | `submitVideoRetalkJob()` |
-| POST | `video-retalk/jobs/query` | `queryVideoRetalkJob()` |
-| GET | `video-retalk/jobs/:task_id` | `getVideoRetalkJob()` |
 | GET | `history` | `getHistory()` |
 
 ### AiGeminiController
@@ -250,7 +244,6 @@
 - `resolveUpstreamEndpointCandidates()`
 - `buildAttemptedEndpointsSuffix()`
 - `shouldUseDashscopeNative()`
-- `shouldUseAliyunIceVideoTranslation()`
 - `shouldUseDashscopeCompatibleStt()`
 - `shouldUseRunningHub()`
 - `normalizeRunningHubSyncImageErrorMessage()`
@@ -284,7 +277,6 @@
 - `resolveDashscopeNativeSttEndpoint()`
 - `resolveDashscopeNativeVideoEndpoint()`
 - `normalizeDashscopeNativeEndpointPath()`
-- `isDashscopeVideoRetalkRoute()`
 - `normalizeDashscopeNativeBaseUrl()`
 - `buildDashscopeEndpointUrl()`
 - `normalizeDashscopeVideoResolution()`
@@ -450,15 +442,7 @@
 - `normalizePositiveIntegerOrZero()`
 - `normalizeObject()`
 - `normalizeAliyunIceInputType()`
-- `assignIfDefined()`
-- `compactObject()`
 - `stringifyJsonField()`
-- `extractAliyunIceVideoTranslationJobId()`
-- `extractAliyunIceVideoTranslationStatus()`
-- `isAliyunIceVideoTranslationTerminalSuccess()`
-- `isAliyunIceVideoTranslationTerminalFailure()`
-- `extractAliyunIceVideoTranslationErrorMessage()`
-- `extractAliyunIceVideoTranslationOutputUrls()`
 - `collectUrlStrings()`
 - `safeJsonPreview()`
 - `logAiTrace()`
@@ -666,7 +650,6 @@
 - `isOpenRouterSource()`
 - `normalizeEndpointPathForProvider()`
 - `isDashscopeNativeApiType()`
-- `isDashscopeVideoRetalkModel()`
 - `isDashscopeSource()`
 - `isAliyunIceSource()`
 - `resolveAliyunIceAccessKeySecret()`

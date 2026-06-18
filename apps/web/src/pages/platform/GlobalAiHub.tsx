@@ -160,13 +160,6 @@ const DASHSCOPE_COSYVOICE_TTS_API_TYPE = 'dashscope-cosyvoice-tts';
 const DASHSCOPE_COSYVOICE_VOICE_CLONE_API_TYPE = 'dashscope-cosyvoice-voice-clone';
 const DASHSCOPE_COSYVOICE_TTS_ENDPOINT = '/services/audio/tts/SpeechSynthesizer';
 const DASHSCOPE_COSYVOICE_VOICE_CLONE_ENDPOINT = '/services/audio/tts/customization';
-const ALIYUN_ICE_PROVIDER_TYPE = 'aliyun-ice';
-const ALIYUN_ICE_VIDEO_TRANSLATION_API_TYPE = 'aliyun-ice-video-translation';
-const ALIYUN_ICE_VIDEO_TRANSLATION_MODEL_KEY = 'aliyun-video-translation';
-const ALIYUN_ICE_DEFAULT_ENDPOINT = 'ice.cn-shanghai.aliyuncs.com';
-const DASHSCOPE_VIDEORETALK_API_TYPE = 'dashscope-videoretalk';
-const DASHSCOPE_VIDEORETALK_MODEL_KEY = 'videoretalk';
-const DASHSCOPE_VIDEORETALK_ENDPOINT = '/api/v1/services/aigc/image2video/video-synthesis';
 
 const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
   {
@@ -186,12 +179,6 @@ const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     label: 'DashScope CosyVoice',
     base_url: 'https://dashscope.aliyuncs.com/api/v1',
     description: 'CosyVoice 语音合成和声音复刻',
-  },
-  {
-    provider_type: ALIYUN_ICE_PROVIDER_TYPE,
-    label: 'Aliyun ICE',
-    base_url: ALIYUN_ICE_DEFAULT_ENDPOINT,
-    description: '阿里云智能媒体服务视频翻译',
   },
   {
     provider_type: 'dashscope-openai-intl',
@@ -385,31 +372,13 @@ const inferAudioModelKind = (apiType?: string | null, endpointPath?: string | nu
 const isRunningHubProviderType = (providerType?: string | null): boolean =>
   String(providerType || '').trim().toLowerCase() === RUNNINGHUB_PROVIDER_TYPE;
 
-const isAliyunIceProviderType = (providerType?: string | null): boolean =>
-  String(providerType || '').trim().toLowerCase() === ALIYUN_ICE_PROVIDER_TYPE;
-
 const isDashscopeOpenAiProviderType = (providerType?: string | null): boolean =>
   String(providerType || '').trim().toLowerCase().startsWith('dashscope-openai');
-
-const isDashscopeVideoRetalkModel = (form: Pick<AiModelForm, 'capability' | 'model_key' | 'upstream_model' | 'api_type'>): boolean => {
-  const normalizedModelKey = form.model_key.trim().toLowerCase();
-  const normalizedUpstreamModel = form.upstream_model.trim().toLowerCase();
-  const normalizedApiType = form.api_type.trim().toLowerCase();
-  return form.capability === 'video'
-    && (
-      normalizedModelKey === DASHSCOPE_VIDEORETALK_MODEL_KEY
-      || normalizedUpstreamModel === DASHSCOPE_VIDEORETALK_MODEL_KEY
-      || normalizedApiType === DASHSCOPE_VIDEORETALK_API_TYPE
-    );
-};
 
 function resolveDefaultSourceTestPath(providerType?: string | null): string {
   const normalizedProvider = String(providerType || '').trim().toLowerCase();
   if (isRunningHubProviderType(providerType)) {
     return RUNNINGHUB_SOURCE_TEST_PATH;
-  }
-  if (isAliyunIceProviderType(providerType)) {
-    return '/';
   }
   if (isVertexAiProviderType(providerType)) {
     return '/';
@@ -469,34 +438,6 @@ function applyRunningHubModelDefaults(form: AiModelForm): AiModelForm {
       form.upstream_model,
     ),
     api_type: RUNNINGHUB_TASK_API_TYPE,
-  };
-}
-
-function applyAliyunIceVideoTranslationDefaults(form: AiModelForm): AiModelForm {
-  return {
-    ...form,
-    model_key: form.model_key.trim() || ALIYUN_ICE_VIDEO_TRANSLATION_MODEL_KEY,
-    display_name: form.display_name.trim() || '视频翻译',
-    capability: 'video',
-    execution_mode: 'async',
-    pricing_mode: 'per_call',
-    upstream_model: 'SubmitVideoTranslationJob',
-    endpoint_path: '/SubmitVideoTranslationJob',
-    api_type: ALIYUN_ICE_VIDEO_TRANSLATION_API_TYPE,
-  };
-}
-
-function applyDashscopeVideoRetalkDefaults(form: AiModelForm): AiModelForm {
-  return {
-    ...form,
-    model_key: form.model_key.trim() || DASHSCOPE_VIDEORETALK_MODEL_KEY,
-    display_name: form.display_name.trim() || 'VideoRetalk',
-    capability: 'video',
-    execution_mode: 'async',
-    pricing_mode: 'per_call',
-    upstream_model: DASHSCOPE_VIDEORETALK_MODEL_KEY,
-    endpoint_path: DASHSCOPE_VIDEORETALK_ENDPOINT,
-    api_type: DASHSCOPE_VIDEORETALK_API_TYPE,
   };
 }
 
@@ -1736,42 +1677,6 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
     setModelModalOpen(true);
   };
 
-  const openCreateAliyunIceVideoTranslationModelModal = () => {
-    const videoSource = aiSources.find((item) => item.is_active && isAliyunIceProviderType(item.provider_type))
-      || aiSources.find((item) => isAliyunIceProviderType(item.provider_type));
-    resetAiModelForm();
-    setAiModelForm((prev) => {
-      const nextForm = videoSource
-        ? {
-            ...prev,
-            default_source_id: videoSource.id,
-            source_routes: [buildDefaultModelSourceRoute(videoSource.id)],
-          }
-        : prev;
-      return applyAliyunIceVideoTranslationDefaults(nextForm);
-    });
-    setAiModelTestSourceId(videoSource?.id || '');
-    setModelModalOpen(true);
-  };
-
-  const openCreateDashscopeVideoRetalkModelModal = () => {
-    const videoSource = aiSources.find((item) => item.is_active && isDashscopeOpenAiProviderType(item.provider_type))
-      || aiSources.find((item) => isDashscopeOpenAiProviderType(item.provider_type));
-    resetAiModelForm();
-    setAiModelForm((prev) => {
-      const nextForm = videoSource
-        ? {
-            ...prev,
-            default_source_id: videoSource.id,
-            source_routes: [buildDefaultModelSourceRoute(videoSource.id)],
-          }
-        : prev;
-      return applyDashscopeVideoRetalkDefaults(nextForm);
-    });
-    setAiModelTestSourceId(videoSource?.id || '');
-    setModelModalOpen(true);
-  };
-
   const openCreateVoiceCloneModelModal = () => {
     const audioSource = aiSources.find((item) => item.is_active && supportsVoiceCloneProviderType(item.provider_type))
       || aiSources.find((item) => supportsVoiceCloneProviderType(item.provider_type));
@@ -1935,7 +1840,7 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
               location: prev.credentials.location || 'global',
             }
           : prev.credentials,
-        test_path: isRunningHubProviderType(providerType) || isAliyunIceProviderType(providerType) || shouldApplyPresetTestPath
+        test_path: isRunningHubProviderType(providerType) || shouldApplyPresetTestPath
           ? nextDefaultTestPath
           : prev.test_path,
       };
@@ -1949,12 +1854,6 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
       upstream_model: modelName,
       display_name: prev.display_name.trim() ? prev.display_name : modelName,
     }));
-  };
-
-  const applyDashscopeVideoRetalkTemplate = () => {
-    setAiModelTestMode('default');
-    setAiModelTestResult(null);
-    setAiModelForm((prev) => applyDashscopeVideoRetalkDefaults(prev));
   };
 
   const handleModelCapabilityChange = (capability: AiModelForm['capability']) => {
@@ -1977,12 +1876,6 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
           ),
           api_type: RUNNINGHUB_TASK_API_TYPE,
         };
-      }
-      if (capability === 'video' && isAliyunIceProviderType(nextSource?.provider_type)) {
-        return applyAliyunIceVideoTranslationDefaults({
-          ...prev,
-          capability,
-        });
       }
       if (capability === 'tts' && isAudioProviderType(nextSource?.provider_type)) {
         return {
@@ -2017,9 +1910,6 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
       };
       if (nextRoutes.length === 1 && isRunningHubProviderType(source?.provider_type)) {
         return applyRunningHubModelDefaults(nextForm);
-      }
-      if (nextRoutes.length === 1 && prev.capability === 'video' && isAliyunIceProviderType(source?.provider_type)) {
-        return applyAliyunIceVideoTranslationDefaults(nextForm);
       }
       if (nextRoutes.length === 1 && prev.capability === 'tts' && isAudioProviderType(source?.provider_type)) {
         return {
@@ -2527,10 +2417,6 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
         .map((item, index) => {
           const routeSource = aiSourceMap.get(item.source_id);
           const isAudioRoute = isAudioProviderModel && isAudioProviderType(routeSource?.provider_type);
-          const isAliyunIceRoute = aiModelForm.capability === 'video' && isAliyunIceProviderType(routeSource?.provider_type);
-          const isDashscopeVideoRetalkRoute =
-            isDashscopeVideoRetalkModel(aiModelForm)
-            && isDashscopeOpenAiProviderType(routeSource?.provider_type);
           const routeRequestOverrides = parseJsonObject(item.request_overrides_json, '来源覆盖参数');
           if (isAudioRoute) {
             const nextRouteAudioOverrides: Record<string, unknown> = {
@@ -2558,23 +2444,11 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
             source_id: item.source_id,
             sort_order: index,
             is_active: item.is_active,
-            upstream_model: isAliyunIceRoute
-              ? 'SubmitVideoTranslationJob'
-              : isDashscopeVideoRetalkRoute
-              ? DASHSCOPE_VIDEORETALK_MODEL_KEY
-              : item.upstream_model.trim() || (isAudioRoute ? (isMinimaxVoiceCloneModel ? resolveDefaultVoiceCloneModel(routeSource?.provider_type) : resolveDefaultAudioSpeechModel(routeSource?.provider_type)) : null),
-            endpoint_path: isAliyunIceRoute
-              ? '/SubmitVideoTranslationJob'
-              : isDashscopeVideoRetalkRoute
-              ? DASHSCOPE_VIDEORETALK_ENDPOINT
-              : isAudioRoute
+            upstream_model: item.upstream_model.trim() || (isAudioRoute ? (isMinimaxVoiceCloneModel ? resolveDefaultVoiceCloneModel(routeSource?.provider_type) : resolveDefaultAudioSpeechModel(routeSource?.provider_type)) : null),
+            endpoint_path: isAudioRoute
               ? isMinimaxVoiceCloneModel ? resolveAudioVoiceCloneEndpoint(routeSource?.provider_type) : resolveAudioSpeechEndpoint(routeSource?.provider_type)
               : item.endpoint_path.trim() || null,
-            api_type: isAliyunIceRoute
-              ? ALIYUN_ICE_VIDEO_TRANSLATION_API_TYPE
-              : isDashscopeVideoRetalkRoute
-              ? DASHSCOPE_VIDEORETALK_API_TYPE
-              : isAudioRoute
+            api_type: isAudioRoute
               ? isMinimaxVoiceCloneModel ? resolveAudioVoiceCloneApiType(routeSource?.provider_type) : resolveAudioSpeechApiType(routeSource?.provider_type)
               : item.api_type.trim() || null,
             request_overrides: routeRequestOverrides,
@@ -2586,10 +2460,6 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
       const primarySourceId = sourceRoutes.find((item) => item.is_active)?.source_id || sourceRoutes[0].source_id;
       const primarySource = aiSourceMap.get(primarySourceId);
       const isRunningHubModel = isRunningHubProviderType(primarySource?.provider_type);
-      const isAliyunIceVideoTranslationModel =
-        aiModelForm.capability === 'video' && isAliyunIceProviderType(primarySource?.provider_type);
-      const isDashscopeVideoRetalkPrimaryModel =
-        isDashscopeVideoRetalkModel(aiModelForm) && isDashscopeOpenAiProviderType(primarySource?.provider_type);
       const pricingMode = isMinimaxVoiceCloneModel
         ? 'per_call'
         : isAudioProviderModel
@@ -2609,26 +2479,14 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
         points_per_minute: sellPointsPerMinute,
         default_source_id: primarySourceId,
         source_routes: sourceRoutes,
-        upstream_model: isAliyunIceVideoTranslationModel
-          ? 'SubmitVideoTranslationJob'
-          : isDashscopeVideoRetalkPrimaryModel
-            ? DASHSCOPE_VIDEORETALK_MODEL_KEY
-          : aiModelForm.upstream_model.trim() || aiModelForm.model_key.trim(),
+        upstream_model: aiModelForm.upstream_model.trim() || aiModelForm.model_key.trim(),
         endpoint_path: isAudioProviderModel
           ? isMinimaxVoiceCloneModel ? resolveAudioVoiceCloneEndpoint(primarySource?.provider_type) : resolveAudioSpeechEndpoint(primarySource?.provider_type)
-          : isAliyunIceVideoTranslationModel
-            ? '/SubmitVideoTranslationJob'
-          : isDashscopeVideoRetalkPrimaryModel
-            ? DASHSCOPE_VIDEORETALK_ENDPOINT
           : isRunningHubModel
             ? resolveRunningHubEndpointRoot(aiModelForm.endpoint_path, aiModelForm.upstream_model)
             : aiModelForm.endpoint_path.trim() || CAPABILITY_DEFAULT_ENDPOINT.get(aiModelForm.capability) || '/chat/completions',
         api_type: isAudioProviderModel
           ? isMinimaxVoiceCloneModel ? resolveAudioVoiceCloneApiType(primarySource?.provider_type) : resolveAudioSpeechApiType(primarySource?.provider_type)
-          : isAliyunIceVideoTranslationModel
-            ? ALIYUN_ICE_VIDEO_TRANSLATION_API_TYPE
-          : isDashscopeVideoRetalkPrimaryModel
-            ? DASHSCOPE_VIDEORETALK_API_TYPE
           : isRunningHubModel
             ? RUNNINGHUB_TASK_API_TYPE
             : aiModelForm.api_type.trim() || 'openai-chat-completions',
@@ -3067,12 +2925,6 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
           <div className="platform-section-head">
             <h3>模型列表</h3>
             <div className="button-row compact">
-              <button className="btn btn-secondary btn-sm" onClick={openCreateAliyunIceVideoTranslationModelModal}>
-                + 视频翻译
-              </button>
-              <button className="btn btn-secondary btn-sm" onClick={openCreateDashscopeVideoRetalkModelModal}>
-                + VideoRetalk
-              </button>
               <button className="btn btn-secondary btn-sm" onClick={openCreateVoiceCloneModelModal}>
                 + 声音复刻
               </button>
@@ -4071,13 +3923,6 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
                         {item}
                       </button>
                     ))}
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={applyDashscopeVideoRetalkTemplate}
-                    >
-                      VideoRetalk
-                    </button>
                   </div>
                 </div>
               )}

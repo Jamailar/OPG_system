@@ -545,27 +545,19 @@ const MINIMAX_TTS_SYNC_API_TYPE = 'minimax-tts-sync';
 const MINIMAX_TTS_ASYNC_API_TYPE = 'minimax-tts-async';
 const MINIMAX_TTS_API_TYPE = 'minimax-tts';
 const MINIMAX_VOICE_CLONE_API_TYPE = 'minimax-voice-clone';
-const ALIYUN_ICE_PROVIDER_TYPE = 'aliyun-ice';
-const ALIYUN_ICE_VIDEO_TRANSLATION_API_TYPE = 'aliyun-ice-video-translation';
 const DASHSCOPE_COSYVOICE_TTS_API_TYPE = 'dashscope-cosyvoice-tts';
 const DASHSCOPE_COSYVOICE_VOICE_CLONE_API_TYPE = 'dashscope-cosyvoice-voice-clone';
 const DASHSCOPE_NATIVE_IMAGE_API_TYPE = 'dashscope-native-image';
 const DASHSCOPE_NATIVE_STT_API_TYPE = 'dashscope-native-stt';
 const DASHSCOPE_NATIVE_VIDEO_API_TYPE = 'dashscope-native-video';
-const DASHSCOPE_VIDEORETALK_API_TYPE = 'dashscope-videoretalk';
 const DASHSCOPE_COSYVOICE_TTS_DEFAULT_ENDPOINT = '/services/audio/tts/SpeechSynthesizer';
 const DASHSCOPE_COSYVOICE_VOICE_CLONE_DEFAULT_ENDPOINT = '/services/audio/tts/customization';
 const DASHSCOPE_NATIVE_IMAGE_DEFAULT_ENDPOINT = '/api/v1/services/aigc/image-generation/generation';
 const DASHSCOPE_NATIVE_IMAGE_MULTIMODAL_ENDPOINT = '/api/v1/services/aigc/multimodal-generation/generation';
 const DASHSCOPE_NATIVE_STT_DEFAULT_ENDPOINT = '/api/v1/services/audio/asr/transcription';
 const DASHSCOPE_NATIVE_VIDEO_DEFAULT_ENDPOINT = '/api/v1/services/aigc/video-generation/video-synthesis';
-const DASHSCOPE_VIDEORETALK_DEFAULT_ENDPOINT = '/api/v1/services/aigc/image2video/video-synthesis';
 const DASHSCOPE_NATIVE_VIDEO_TEST_IMAGE_URL =
   'https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20250925/wpimhv/rap.png';
-const DASHSCOPE_VIDEORETALK_TEST_VIDEO_URL =
-  'https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20250717/pvegot/input_video_01.mp4';
-const DASHSCOPE_VIDEORETALK_TEST_AUDIO_URL =
-  'https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20250717/aumwir/stella2-%E6%9C%89%E5%A3%B0%E4%B9%A67.wav';
 const OPENROUTER_PROVIDER_TYPE = 'openrouter-openai';
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 const OPENROUTER_CHAT_API_TYPE = 'openrouter-chat-completions';
@@ -1019,15 +1011,6 @@ export class AiRoutingService implements OnModuleInit {
           timeoutMs,
         }));
       }
-      if (this.isAliyunIceSource(providerType, baseUrl)) {
-        return this.outboundHttp.runWithProxy(outboundProxyId, () => this.testAliyunIceSourceConnectivity({
-          providerType,
-          baseUrl,
-          apiKey,
-          customHeaders,
-          timeoutMs,
-        }));
-      }
       if (this.isAnthropicSource(providerType, baseUrl)) {
         return this.outboundHttp.runWithProxy(outboundProxyId, () => this.testSourceConnectivityViaAnthropicSdk({
           providerType,
@@ -1217,14 +1200,6 @@ export class AiRoutingService implements OnModuleInit {
         endpointPath: normalizedEndpointPath,
         requestOverrides,
         testPrompt,
-        timeoutMs,
-      });
-    }
-    if (this.isAliyunIceSource(source.provider_type, source.base_url)) {
-      return this.testAliyunIceModelConnectivity({
-        source,
-        modelKey,
-        upstreamModel,
         timeoutMs,
       });
     }
@@ -5156,9 +5131,6 @@ export class AiRoutingService implements OnModuleInit {
     if (normalizedApiType === RUNNINGHUB_TASK_API_TYPE) {
       return RUNNINGHUB_DEFAULT_QUERY_PATH;
     }
-    if (normalizedApiType === ALIYUN_ICE_VIDEO_TRANSLATION_API_TYPE) {
-      return '/SubmitVideoTranslationJob';
-    }
     if (normalizedApiType === DASHSCOPE_NATIVE_IMAGE_API_TYPE) {
       return DASHSCOPE_NATIVE_IMAGE_DEFAULT_ENDPOINT;
     }
@@ -5167,9 +5139,6 @@ export class AiRoutingService implements OnModuleInit {
     }
     if (normalizedApiType === DASHSCOPE_NATIVE_VIDEO_API_TYPE) {
       return DASHSCOPE_NATIVE_VIDEO_DEFAULT_ENDPOINT;
-    }
-    if (normalizedApiType === DASHSCOPE_VIDEORETALK_API_TYPE) {
-      return DASHSCOPE_VIDEORETALK_DEFAULT_ENDPOINT;
     }
     if (normalizedApiType === DASHSCOPE_COSYVOICE_TTS_API_TYPE) {
       return DASHSCOPE_COSYVOICE_TTS_DEFAULT_ENDPOINT;
@@ -5240,11 +5209,6 @@ export class AiRoutingService implements OnModuleInit {
     if (isRunningHubSource(providerType, baseUrl)) {
       return RUNNINGHUB_TASK_API_TYPE;
     }
-    if (this.isAliyunIceSource(providerType, baseUrl)) {
-      return normalizedApiType === ALIYUN_ICE_VIDEO_TRANSLATION_API_TYPE
-        ? ALIYUN_ICE_VIDEO_TRANSLATION_API_TYPE
-        : (String(apiType || '').trim() || ALIYUN_ICE_VIDEO_TRANSLATION_API_TYPE);
-    }
     if (this.isOpenRouterSource(providerType, baseUrl)) {
       if (this.isOpenRouterApiType(normalizedApiType)) {
         return normalizedApiType;
@@ -5280,9 +5244,6 @@ export class AiRoutingService implements OnModuleInit {
       return DASHSCOPE_NATIVE_IMAGE_API_TYPE;
     }
     if (capability === 'video') {
-      if (this.isDashscopeVideoRetalkModel(upstreamModel) || normalizedSanitizedApiType === DASHSCOPE_VIDEORETALK_API_TYPE) {
-        return DASHSCOPE_VIDEORETALK_API_TYPE;
-      }
       return DASHSCOPE_NATIVE_VIDEO_API_TYPE;
     }
     return sanitizedApiType;
@@ -5308,9 +5269,6 @@ export class AiRoutingService implements OnModuleInit {
     if (capability === 'image' && (normalizedPath === '/images/generations' || normalizedPath === '/v1/images/generations')) {
       return DASHSCOPE_NATIVE_IMAGE_DEFAULT_ENDPOINT;
     }
-    if (apiType === DASHSCOPE_VIDEORETALK_API_TYPE) {
-      return DASHSCOPE_VIDEORETALK_DEFAULT_ENDPOINT;
-    }
     if (capability === 'video' && (normalizedPath === '/videos/generations' || normalizedPath === '/v1/videos/generations')) {
       return DASHSCOPE_NATIVE_VIDEO_DEFAULT_ENDPOINT;
     }
@@ -5324,9 +5282,6 @@ export class AiRoutingService implements OnModuleInit {
     baseUrl: string,
   ): boolean {
     if (capability !== 'image' && capability !== 'stt' && capability !== 'video') {
-      return false;
-    }
-    if (this.isAliyunIceSource(providerType, baseUrl)) {
       return false;
     }
     if (this.isDashscopeNativeApiType(apiType)) {
@@ -5343,227 +5298,18 @@ export class AiRoutingService implements OnModuleInit {
     return normalized === DASHSCOPE_NATIVE_IMAGE_API_TYPE
       || normalized === DASHSCOPE_NATIVE_STT_API_TYPE
       || normalized === DASHSCOPE_NATIVE_VIDEO_API_TYPE
-      || normalized === DASHSCOPE_VIDEORETALK_API_TYPE
       || normalized.startsWith('dashscope-native')
       || normalized.startsWith('aliyun-native');
-  }
-
-  private isDashscopeVideoRetalkModel(value: unknown): boolean {
-    return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '') === 'videoretalk';
   }
 
   private isDashscopeSource(providerType: string, baseUrl: string): boolean {
     const provider = String(providerType || '').trim().toLowerCase();
     const url = String(baseUrl || '').trim().toLowerCase();
-    if (this.isAliyunIceSource(provider, url)) {
-      return false;
-    }
     return provider.includes('dashscope')
       || provider.includes('aliyun')
       || url.includes('dashscope.aliyuncs.com')
       || url.includes('dashscope-intl.aliyuncs.com')
       || url.includes('dashscope-us.aliyuncs.com');
-  }
-
-  private isAliyunIceSource(providerType: string, baseUrl: string): boolean {
-    const provider = String(providerType || '').trim().toLowerCase();
-    const url = String(baseUrl || '').trim().toLowerCase();
-    return provider === ALIYUN_ICE_PROVIDER_TYPE
-      || provider.includes('aliyun-ice')
-      || (url.includes('ice.') && url.includes('aliyuncs.com'));
-  }
-
-  private async testAliyunIceSourceConnectivity(input: {
-    providerType: string;
-    baseUrl: string;
-    apiKey: string;
-    customHeaders: Record<string, string>;
-    timeoutMs: number;
-  }): Promise<AiSourceConnectivityTestResult> {
-    const startedAt = Date.now();
-    const endpoint = this.normalizeAliyunIceEndpoint(input.customHeaders.endpoint || input.baseUrl);
-    const testJobId = String(input.customHeaders.test_job_id || input.customHeaders.testJobId || '').trim();
-    try {
-      if (!this.resolveAliyunIceAccessKeySecret(input.customHeaders)) {
-        return {
-          ok: false,
-          status_code: null,
-          latency_ms: Date.now() - startedAt,
-          endpoint_url: endpoint,
-          provider_type: input.providerType,
-          message: '请在自定义请求头中填写 access_key_secret',
-          response_excerpt: '',
-        };
-      }
-      if (!testJobId) {
-        return {
-          ok: true,
-          status_code: null,
-          latency_ms: Date.now() - startedAt,
-          endpoint_url: endpoint,
-          provider_type: input.providerType,
-          message: '凭据格式已通过；填写 test_job_id 后可查询验证',
-          response_excerpt: '',
-        };
-      }
-      const sdk = await import('@alicloud/ice20201109');
-      const client = this.createAliyunIceProbeClient(input.apiKey, input.baseUrl, input.customHeaders, sdk);
-      const request = new (sdk as any).GetSmartHandleJobRequest({ jobId: testJobId });
-      const response = await Promise.race([
-        client.getSmartHandleJob(request),
-        new Promise((_, reject) => setTimeout(() => reject(new Error(`连接超时（>${input.timeoutMs}ms）`)), input.timeoutMs)),
-      ]);
-      const body = this.normalizeAliyunIceProbeResponse(response);
-      return {
-        ok: true,
-        status_code: 200,
-        latency_ms: Date.now() - startedAt,
-        endpoint_url: endpoint,
-        provider_type: input.providerType,
-        message: '连通性测试通过',
-        response_excerpt: this.truncate(JSON.stringify(body), 500),
-      };
-    } catch (error: any) {
-      return {
-        ok: false,
-        status_code: null,
-        latency_ms: Date.now() - startedAt,
-        endpoint_url: endpoint,
-        provider_type: input.providerType,
-        message: `连接失败：${error?.message || 'unknown error'}`,
-        response_excerpt: '',
-      };
-    }
-  }
-
-  private async testAliyunIceModelConnectivity(input: {
-    source: AiGlobalSourceRow;
-    modelKey: string;
-    upstreamModel: string;
-    timeoutMs: number;
-  }): Promise<AiModelConnectivityTestResult> {
-    const startedAt = Date.now();
-    const customHeaders = this.normalizeStringObject(input.source.custom_headers);
-    const endpoint = this.normalizeAliyunIceEndpoint(customHeaders.endpoint || input.source.base_url);
-    const testJobId = String(customHeaders.test_job_id || customHeaders.testJobId || '').trim();
-    try {
-      if (!this.resolveAliyunIceAccessKeySecret(customHeaders)) {
-        return {
-          ok: false,
-          status_code: null,
-          latency_ms: Date.now() - startedAt,
-          endpoint_url: endpoint,
-          model_key: input.modelKey,
-          upstream_model: input.upstreamModel,
-          source_id: input.source.id,
-          source_name: input.source.name,
-          provider_type: input.source.provider_type,
-          message: '请在供应商自定义请求头中填写 access_key_secret',
-          response_excerpt: '',
-        };
-      }
-      if (!testJobId) {
-        return {
-          ok: true,
-          status_code: null,
-          latency_ms: Date.now() - startedAt,
-          endpoint_url: endpoint,
-          model_key: input.modelKey,
-          upstream_model: input.upstreamModel,
-          source_id: input.source.id,
-          source_name: input.source.name,
-          provider_type: input.source.provider_type,
-          message: '模型配置已通过；填写 test_job_id 后可查询验证',
-          response_excerpt: '',
-        };
-      }
-      const sdk = await import('@alicloud/ice20201109');
-      const client = this.createAliyunIceProbeClient(input.source.api_key, input.source.base_url, customHeaders, sdk);
-      const request = new (sdk as any).GetSmartHandleJobRequest({ jobId: testJobId });
-      const response = await Promise.race([
-        client.getSmartHandleJob(request),
-        new Promise((_, reject) => setTimeout(() => reject(new Error(`连接超时（>${input.timeoutMs}ms）`)), input.timeoutMs)),
-      ]);
-      const body = this.normalizeAliyunIceProbeResponse(response);
-      return {
-        ok: true,
-        status_code: 200,
-        latency_ms: Date.now() - startedAt,
-        endpoint_url: endpoint,
-        model_key: input.modelKey,
-        upstream_model: input.upstreamModel,
-        source_id: input.source.id,
-        source_name: input.source.name,
-        provider_type: input.source.provider_type,
-        message: '模型测试通过',
-        response_excerpt: this.truncate(JSON.stringify(body), 500),
-      };
-    } catch (error: any) {
-      return {
-        ok: false,
-        status_code: null,
-        latency_ms: Date.now() - startedAt,
-        endpoint_url: endpoint,
-        model_key: input.modelKey,
-        upstream_model: input.upstreamModel,
-        source_id: input.source.id,
-        source_name: input.source.name,
-        provider_type: input.source.provider_type,
-        message: `连接失败：${error?.message || 'unknown error'}`,
-        response_excerpt: '',
-      };
-    }
-  }
-
-  private createAliyunIceProbeClient(
-    accessKeyId: string,
-    baseUrl: string,
-    customHeaders: Record<string, string>,
-    sdk: any,
-  ): any {
-    const accessKeySecret = this.resolveAliyunIceAccessKeySecret(customHeaders);
-    if (!accessKeyId || !accessKeySecret) {
-      throw new BadRequestException('Aliyun ICE source requires api_key and access_key_secret');
-    }
-    const Client = sdk.default || sdk.Client || sdk;
-    return new Client({
-      accessKeyId,
-      accessKeySecret,
-      regionId: customHeaders.region_id || customHeaders.regionId || this.extractAliyunRegionFromEndpoint(baseUrl) || 'cn-shanghai',
-      endpoint: this.normalizeAliyunIceEndpoint(customHeaders.endpoint || baseUrl),
-      protocol: 'HTTPS',
-      readTimeout: 30_000,
-      connectTimeout: 10_000,
-    });
-  }
-
-  private resolveAliyunIceAccessKeySecret(customHeaders: Record<string, string>): string {
-    return String(
-      customHeaders.access_key_secret
-      || customHeaders.accessKeySecret
-      || customHeaders.secret
-      || customHeaders.secret_key
-      || customHeaders.access_key
-      || '',
-    ).trim();
-  }
-
-  private normalizeAliyunIceEndpoint(value: string): string {
-    return String(value || 'ice.cn-shanghai.aliyuncs.com')
-      .trim()
-      .replace(/^https?:\/\//i, '')
-      .replace(/\/+$/, '') || 'ice.cn-shanghai.aliyuncs.com';
-  }
-
-  private extractAliyunRegionFromEndpoint(value: string): string | null {
-    const endpoint = String(value || '').trim().toLowerCase();
-    const match = endpoint.match(/(?:^|\.)(cn-[a-z0-9-]+|ap-[a-z0-9-]+|us-[a-z0-9-]+|eu-[a-z0-9-]+)\.aliyuncs\.com/);
-    return match?.[1] || null;
-  }
-
-  private normalizeAliyunIceProbeResponse(response: any): Record<string, unknown> {
-    const rawBody = response?.body;
-    return this.normalizeObject(typeof rawBody?.toMap === 'function' ? rawBody.toMap() : rawBody);
   }
 
   private normalizeDashscopeNativeBaseUrl(baseUrl: string): string {
@@ -5713,24 +5459,6 @@ export class AiRoutingService implements OnModuleInit {
       }
       if (parameters.watermark === undefined) {
         parameters.watermark = false;
-      }
-      if (this.isDashscopeVideoRetalkModel(upstreamModel)) {
-        delete parameters.resolution;
-        delete parameters.duration;
-        delete parameters.prompt_extend;
-        delete parameters.watermark;
-        return {
-          ...requestOverrides,
-          model: upstreamModel,
-          input: {
-            video_url: DASHSCOPE_VIDEORETALK_TEST_VIDEO_URL,
-            audio_url: DASHSCOPE_VIDEORETALK_TEST_AUDIO_URL,
-          },
-          parameters: {
-            ...parameters,
-            video_extension: parameters.video_extension ?? false,
-          },
-        };
       }
       const wan27Mode = this.resolveDashscopeWan27VideoMode(upstreamModel);
       if (wan27Mode === 't2v') {

@@ -9,7 +9,7 @@ OPG 的 AI Gateway 面向多 app 后端集群，不做通用 API 分销站。它
 推荐使用当前实现路线：
 
 - `AiRoutingService` 自研模型、来源、app route、价格配置和 usage log。
-- `AiChatService` 自研 OpenAI/Gemini/DashScope/RunningHub/Aliyun ICE 等协议适配与 usage 归一化。
+- `AiChatService` 自研 OpenAI/Gemini/DashScope/RunningHub 等协议适配与 usage 归一化。
 - `AiPointsService` 自研积分钱包、ledger、reservation、预扣和实际结算。
 - `AiGatewayUsageQueueService` 继续异步写 usage、扣积分和记录观测事件。
 - UI 不新增复杂账单面板；后台只暴露模型价格、路由和用户账务真值。

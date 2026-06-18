@@ -181,11 +181,6 @@ type MinimaxVoiceCatalog = {
 const MINIMAX_TTS_SYNC_API_TYPE = 'minimax-tts-sync';
 const MINIMAX_TTS_ASYNC_API_TYPE = 'minimax-tts-async';
 const MINIMAX_TTS_API_TYPE = 'minimax-tts';
-const ALIYUN_ICE_PROVIDER_TYPE = 'aliyun-ice';
-const ALIYUN_ICE_VIDEO_TRANSLATION_API_TYPE = 'aliyun-ice-video-translation';
-const ALIYUN_ICE_VIDEO_TRANSLATION_MODEL_KEY = 'aliyun-video-translation';
-const ALIYUN_ICE_DEFAULT_REGION = 'cn-shanghai';
-const ALIYUN_ICE_DEFAULT_ENDPOINT = 'ice.cn-shanghai.aliyuncs.com';
 const DASHSCOPE_COSYVOICE_TTS_API_TYPE = 'dashscope-cosyvoice-tts';
 const DASHSCOPE_COSYVOICE_TTS_ENDPOINT = '/services/audio/tts/SpeechSynthesizer';
 const DASHSCOPE_COSYVOICE_V35_MODELS = new Set(['cosyvoice-v3.5-plus', 'cosyvoice-v3.5-flash']);
@@ -216,8 +211,6 @@ const MINIMAX_TTS_EMOTIONS = new Set([
 const DASHSCOPE_NATIVE_IMAGE_API_TYPE = 'dashscope-native-image';
 const DASHSCOPE_NATIVE_STT_API_TYPE = 'dashscope-native-stt';
 const DASHSCOPE_NATIVE_VIDEO_API_TYPE = 'dashscope-native-video';
-const DASHSCOPE_VIDEORETALK_API_TYPE = 'dashscope-videoretalk';
-const DASHSCOPE_VIDEORETALK_MODEL_KEY = 'videoretalk';
 const OPENROUTER_CHAT_API_TYPE = 'openrouter-chat-completions';
 const OPENROUTER_EMBEDDINGS_API_TYPE = 'openrouter-embeddings';
 const OPENROUTER_AUDIO_SPEECH_API_TYPE = 'openrouter-audio-speech';
@@ -228,7 +221,6 @@ const DASHSCOPE_TEMP_URL_EXPIRES_SECONDS = 60 * 30;
 const DASHSCOPE_TEMP_UPLOAD_PREFIX = 'tmp/ai-dashscope-bridge';
 const DASHSCOPE_NATIVE_STT_ENDPOINT = '/api/v1/services/audio/asr/transcription';
 const DASHSCOPE_NATIVE_VIDEO_ENDPOINT = '/api/v1/services/aigc/video-generation/video-synthesis';
-const DASHSCOPE_VIDEORETALK_ENDPOINT = '/api/v1/services/aigc/image2video/video-synthesis';
 const DASHSCOPE_TASK_QUERY_ENDPOINT_PREFIX = '/api/v1/tasks/';
 const DASHSCOPE_VIDEO_QUEUE_CONCURRENCY_LIMIT = 5;
 const VIDEO_UPSTREAM_TIMEOUT_MS = 60 * 60 * 1000;
@@ -604,7 +596,7 @@ export class AiChatService implements OnModuleInit {
     const nextRequest = (async () => {
       const models = await this.listAvailableModels(appSlug);
 
-      const groupOrder = ['chat', 'embedding', 'image', 'video', 'video_translation', 'video_retalk', 'tts', 'stt', 'other'];
+      const groupOrder = ['chat', 'embedding', 'image', 'video', 'tts', 'stt', 'other'];
       const groups: Record<string, {
         type: string;
         label: string;
@@ -614,8 +606,6 @@ export class AiChatService implements OnModuleInit {
         embedding: { type: 'embedding', label: '向量模型', models: [] },
         image: { type: 'image', label: '图片模型', models: [] },
         video: { type: 'video', label: '视频模型', models: [] },
-        video_translation: { type: 'video_translation', label: '视频翻译', models: [] },
-        video_retalk: { type: 'video_retalk', label: 'VideoRetalk', models: [] },
         tts: { type: 'tts', label: '语音合成', models: [] },
         stt: { type: 'stt', label: '语音识别', models: [] },
         other: { type: 'other', label: '其他模型', models: [] },
@@ -1253,15 +1243,6 @@ export class AiChatService implements OnModuleInit {
           return this.forwardDashscopeNativeVideo(route, upstreamPayload, context);
         }
       }
-      if (this.shouldUseAliyunIceVideoTranslation(route)) {
-        if (route.capability !== 'video') {
-          throw new BadRequestException(`api_type ${route.api_type} 仅支持 capability=video`);
-        }
-        if (options.video_mode === 'async') {
-          return this.forwardAliyunIceVideoTranslationAsync(route, normalizedPayload, context);
-        }
-        throw new BadRequestException('阿里云视频翻译仅支持异步接口');
-      }
       if (this.shouldUseRunningHub(route)) {
         if (route.capability === 'image') {
           return this.forwardRunningHubImage(route, upstreamPayload, context);
@@ -1321,125 +1302,6 @@ export class AiChatService implements OnModuleInit {
       stream: false,
       data,
     };
-  }
-
-  async submitVideoTranslationJob(
-    appSlug: string,
-    payload: Record<string, unknown>,
-    context: AiInvocationContext = {},
-  ): Promise<ForwardedAiResponse> {
-    const route = await this.aiRoutingService.resolveModelRouteByCapability(
-      appSlug,
-      'video',
-      ALIYUN_ICE_VIDEO_TRANSLATION_MODEL_KEY,
-    );
-    if (!this.shouldUseAliyunIceVideoTranslation(route)) {
-      throw new BadRequestException('视频翻译模型未配置为 aliyun-ice-video-translation');
-    }
-    const preparedPayload = this.buildAliyunIceVideoTranslationPayload(route, payload);
-    await this.assertSufficientPointsBeforeInvoke(route, preparedPayload, context);
-    const reservation = await this.reserveAsyncVideoPoints(route, preparedPayload, context);
-    try {
-      const forwarded = await this.forwardAliyunIceVideoTranslationAsync(route, preparedPayload, context);
-      const response = this.normalizeObject((forwarded as ForwardedJsonResponse).data);
-      const providerTaskId = this.extractAliyunIceVideoTranslationJobId(response);
-      if (!providerTaskId) {
-        throw new BadGatewayException('Aliyun ICE video translation accepted but no JobId returned');
-      }
-      const task = await this.createAliyunIceVideoTranslationTask(
-        route,
-        preparedPayload,
-        context,
-        providerTaskId,
-        response,
-        reservation?.reservation_key || null,
-      );
-      if (reservation && context.user_id) {
-        await this.aiPointsService.attachReservationTask({
-          app_id: route.app_id,
-          user_id: context.user_id,
-          reservation_key: reservation.reservation_key,
-          external_task_id: providerTaskId,
-          usage_reference_id: this.stringOrUndefined(task.usage_reference_id) || this.buildAiUsageReferenceId(route, task.public_task_id),
-          metadata: {
-            model_key: route.model_key,
-            upstream_model: route.upstream_model,
-            provider: ALIYUN_ICE_PROVIDER_TYPE,
-          },
-        });
-      }
-      return {
-        stream: false,
-        data: this.buildAliyunIceVideoTranslationSubmitResponse(response, {
-          publicTaskId: task.public_task_id,
-          providerTaskId,
-        }),
-      };
-    } catch (error) {
-      if (reservation && context.user_id) {
-        await this.aiPointsService.releaseReservationByKey({
-          app_id: route.app_id,
-          user_id: context.user_id,
-          reservation_key: reservation.reservation_key,
-          metadata: {
-            reason: 'upstream_create_failed',
-            provider: ALIYUN_ICE_PROVIDER_TYPE,
-            error_message: String((error as any)?.message || 'request failed'),
-          },
-        });
-      }
-      throw error;
-    }
-  }
-
-  async queryVideoTranslationJob(
-    appSlug: string,
-    payload: Record<string, unknown>,
-    context: AiInvocationContext = {},
-  ): Promise<ForwardedAiResponse> {
-    const taskId = this.stringOrUndefined(payload.task_id ?? payload.taskId ?? payload.job_id ?? payload.jobId);
-    if (!taskId) {
-      throw new BadRequestException('task_id is required');
-    }
-    const appId = await this.resolveAppIdBySlug(appSlug);
-    const task = await this.findDashscopeAsyncVideoTask(appId, taskId, context.user_id || null);
-    const route = await this.aiRoutingService.resolveModelRouteByCapability(
-      appSlug,
-      'video',
-      task?.model_key || ALIYUN_ICE_VIDEO_TRANSLATION_MODEL_KEY,
-    );
-    if (!this.shouldUseAliyunIceVideoTranslation(route)) {
-      throw new BadRequestException('视频翻译模型未配置为 aliyun-ice-video-translation');
-    }
-    if (task) {
-      return this.queryAliyunIceVideoTranslationExternalTask(route, task, context);
-    }
-    const providerTaskId = this.stringOrUndefined(payload.provider_task_id ?? payload.providerTaskId) || taskId;
-    const data = await this.fetchAliyunIceVideoTranslationTaskData(route, providerTaskId);
-    return {
-      stream: false,
-      data: this.buildAliyunIceVideoTranslationTaskResponse(data, {
-        includeUrls: true,
-        fallbackTaskId: taskId,
-        providerTaskId,
-      }),
-    };
-  }
-
-  async submitVideoRetalkJob(
-    appSlug: string,
-    payload: Record<string, unknown>,
-    context: AiInvocationContext = {},
-  ): Promise<ForwardedAiResponse> {
-    return this.invokeVideoAsync(appSlug, { ...payload, model: DASHSCOPE_VIDEORETALK_MODEL_KEY }, context);
-  }
-
-  async queryVideoRetalkJob(
-    appSlug: string,
-    payload: Record<string, unknown>,
-    context: AiInvocationContext = {},
-  ): Promise<ForwardedAiResponse> {
-    return this.queryVideoAsyncTask(appSlug, { ...payload, model: DASHSCOPE_VIDEORETALK_MODEL_KEY }, context);
   }
 
   async invokeVideoAsync(
@@ -1518,9 +1380,6 @@ export class AiChatService implements OnModuleInit {
         throw error;
       }
     }
-    if (this.shouldUseAliyunIceVideoTranslation(route)) {
-      return this.submitVideoTranslationJob(appSlug, normalizedPayload, context);
-    }
     if (this.shouldUseOpenRouter(route)) {
       const preparedPayload: Record<string, unknown> = {
         ...route.request_overrides,
@@ -1581,9 +1440,6 @@ export class AiChatService implements OnModuleInit {
       if (this.shouldUseRunningHub(route)) {
         return this.queryRunningHubExternalVideoTask(route, queuedTask, context);
       }
-      if (this.shouldUseAliyunIceVideoTranslation(route)) {
-        return this.queryAliyunIceVideoTranslationExternalTask(route, queuedTask, context);
-      }
       if (!this.shouldUseDashscopeNative(route)) {
         throw new BadRequestException('当前视频模型不支持异步视频任务查询');
       }
@@ -1611,17 +1467,6 @@ export class AiChatService implements OnModuleInit {
           includeVideoUrls: true,
           fallbackTaskId: taskId,
           proxyWaitTimeoutMs: 12_000,
-        }),
-      };
-    }
-    if (this.shouldUseAliyunIceVideoTranslation(route)) {
-      const data = await this.fetchAliyunIceVideoTranslationTaskData(route, taskId);
-      return {
-        stream: false,
-        data: this.buildAliyunIceVideoTranslationTaskResponse(data, {
-          includeUrls: true,
-          fallbackTaskId: taskId,
-          providerTaskId: taskId,
         }),
       };
     }
@@ -1808,181 +1653,6 @@ export class AiChatService implements OnModuleInit {
         proxyWaitTimeoutMs: 12_000,
       }),
     };
-  }
-
-  private async queryAliyunIceVideoTranslationExternalTask(
-    route: ResolvedAiRoute,
-    task: DashscopeAsyncVideoTaskRow,
-    context: AiInvocationContext,
-  ): Promise<ForwardedAiResponse> {
-    const cachedResponse = this.normalizeObject(task.response_json);
-    const cachedStatus = String(task.status || '').toUpperCase();
-    const useCachedTerminalResponse =
-      cachedStatus
-      && (this.isAliyunIceVideoTranslationTerminalSuccess(cachedStatus) || this.isAliyunIceVideoTranslationTerminalFailure(cachedStatus))
-      && Object.keys(cachedResponse).length > 0;
-    const payload = this.normalizeObject(task.request_payload_json);
-    const providerTaskId = this.stringOrUndefined(task.external_task_id) || task.public_task_id;
-    const data = useCachedTerminalResponse
-      ? cachedResponse
-      : await this.fetchAliyunIceVideoTranslationTaskData(route, providerTaskId);
-    await this.finalizeAliyunIceVideoTranslationTaskIfTerminal(route, task, payload, data, providerTaskId, context);
-    return {
-      stream: false,
-      data: this.buildAliyunIceVideoTranslationTaskResponse(data, {
-        includeUrls: true,
-        fallbackTaskId: task.public_task_id,
-        providerTaskId,
-      }),
-    };
-  }
-
-  private async finalizeAliyunIceVideoTranslationTaskIfTerminal(
-    route: ResolvedAiRoute,
-    task: DashscopeAsyncVideoTaskRow | null,
-    payload: Record<string, unknown>,
-    data: Record<string, unknown>,
-    fallbackTaskId: string | null,
-    context: AiInvocationContext,
-  ): Promise<void> {
-    const status = this.extractAliyunIceVideoTranslationStatus(data);
-    const externalTaskId =
-      this.extractAliyunIceVideoTranslationJobId(data)
-      || this.stringOrUndefined(task?.external_task_id)
-      || this.stringOrUndefined(fallbackTaskId)
-      || this.stringOrUndefined(task?.public_task_id);
-    const publicTaskId = this.stringOrUndefined(task?.public_task_id) || externalTaskId;
-    if (!status || (!this.isAliyunIceVideoTranslationTerminalSuccess(status) && !this.isAliyunIceVideoTranslationTerminalFailure(status))) {
-      if (task) {
-        await this.refreshDashscopeAsyncVideoTaskStatus(task.id, status || 'PENDING', data);
-      }
-      return;
-    }
-
-    const usageReferenceId =
-      this.stringOrUndefined(task?.usage_reference_id)
-      || this.buildAiUsageReferenceId(route, publicTaskId || externalTaskId || null);
-    const reservation = externalTaskId && context.user_id
-      ? await this.aiPointsService.findReservationByTask({
-          app_id: route.app_id,
-          user_id: context.user_id,
-          external_task_id: externalTaskId,
-        })
-      : null;
-    const alreadyRecorded = await this.aiRoutingService.hasUsageReference(usageReferenceId);
-
-    if (this.isAliyunIceVideoTranslationTerminalSuccess(status)) {
-      const outputUrls = this.extractAliyunIceVideoTranslationOutputUrls(data);
-      if (outputUrls.length === 0) {
-        const errorMessage = 'Aliyun ICE video translation completed but returned no output url';
-        if (!alreadyRecorded) {
-          this.logUsageSafe(route, payload, context, {
-            success: false,
-            is_stream: false,
-            usage: {},
-            request_id: externalTaskId,
-            usage_reference_id: usageReferenceId,
-            latency_ms: null,
-            error_message: errorMessage,
-            billable: false,
-          });
-        }
-        if (reservation && reservation.status === 'pending' && context.user_id && externalTaskId) {
-          await this.aiPointsService.settleReservation({
-            app_id: route.app_id,
-            user_id: context.user_id,
-            external_task_id: externalTaskId,
-            success: false,
-            settled_points: 0,
-            usage_reference_id: usageReferenceId,
-            request_id: externalTaskId,
-            metadata: {
-              provider: ALIYUN_ICE_PROVIDER_TYPE,
-              request_path: context.request_path || '',
-              error_message: errorMessage,
-            },
-          });
-        }
-        if (task) {
-          await this.finishDashscopeAsyncVideoTask(task.id, status, data, errorMessage);
-        }
-        return;
-      }
-
-      const usage: AiUsageMetrics = {
-        ...this.extractUsageMetrics(data),
-        duration_seconds: this.extractDurationSecondsFromData(data)
-          ?? this.resolveDurationSecondsFromPayload(payload),
-        video_resolution: this.extractVideoResolutionFromData(data)
-          || this.resolveVideoResolutionFromPayload(payload),
-        request_id: externalTaskId,
-      };
-      if (!alreadyRecorded) {
-        this.logUsageSafe(route, payload, context, {
-          success: true,
-          is_stream: false,
-          usage,
-          request_id: externalTaskId,
-          usage_reference_id: usageReferenceId,
-          latency_ms: null,
-          billable: reservation ? false : undefined,
-        });
-      }
-      if (reservation && reservation.status === 'pending' && context.user_id && externalTaskId) {
-        await this.settleAsyncVideoReservationSuccess(
-          route,
-          payload,
-          context,
-          usage,
-          usageReferenceId,
-          externalTaskId,
-          ALIYUN_ICE_PROVIDER_TYPE,
-        );
-      } else if (alreadyRecorded && reservation && reservation.status === 'captured' && reservation.settled_points > 0) {
-        await this.aiRoutingService.updateUsagePointsSettlement({
-          usage_reference_id: usageReferenceId,
-          points_cost: reservation.settled_points,
-          points_pricing_source: this.stringOrUndefined(reservation.metadata?.points_pricing_source) || 'reserved_points_capture',
-        });
-      }
-      if (task) {
-        await this.finishDashscopeAsyncVideoTask(task.id, status, data, null);
-      }
-      return;
-    }
-
-    const errorMessage = this.extractAliyunIceVideoTranslationErrorMessage(data) || `task_status=${status}`;
-    if (!alreadyRecorded) {
-      this.logUsageSafe(route, payload, context, {
-        success: false,
-        is_stream: false,
-        usage: {},
-        request_id: externalTaskId,
-        usage_reference_id: usageReferenceId,
-        latency_ms: null,
-        error_message: this.truncate(errorMessage, 900),
-        billable: false,
-      });
-    }
-    if (reservation && reservation.status === 'pending' && context.user_id && externalTaskId) {
-      await this.aiPointsService.settleReservation({
-        app_id: route.app_id,
-        user_id: context.user_id,
-        external_task_id: externalTaskId,
-        success: false,
-        settled_points: 0,
-        usage_reference_id: usageReferenceId,
-        request_id: externalTaskId,
-        metadata: {
-          provider: ALIYUN_ICE_PROVIDER_TYPE,
-          request_path: context.request_path || '',
-          error_message: errorMessage,
-        },
-      });
-    }
-    if (task) {
-      await this.finishDashscopeAsyncVideoTask(task.id, status, data, errorMessage || null);
-    }
   }
 
   private async finalizeRunningHubVideoTaskIfTerminal(
@@ -2270,58 +1940,6 @@ export class AiChatService implements OnModuleInit {
        RETURNING *`,
       route.app_id,
       userId,
-      this.normalizeNullableString(taskId, 128),
-      route.source.id,
-      route.model_id,
-      route.model_key,
-      route.upstream_model,
-      status,
-      this.normalizeNullableString(reservationKey, 128),
-      this.normalizeNullableString(usageReferenceId, 120),
-      JSON.stringify(preparedPayload),
-      JSON.stringify(response),
-      requestPath,
-      JSON.stringify(metadata),
-    ) as Promise<DashscopeAsyncVideoTaskRow[]>);
-    return rows[0];
-  }
-
-  private async createAliyunIceVideoTranslationTask(
-    route: ResolvedAiRoute,
-    preparedPayload: Record<string, unknown>,
-    context: AiInvocationContext,
-    taskId: string,
-    response: Record<string, unknown>,
-    reservationKey: string | null,
-  ): Promise<DashscopeAsyncVideoTaskRow> {
-    await this.ensureDashscopeVideoQueueSchema();
-    const publicTaskId = this.buildAsyncVideoPublicTaskId(route);
-    const usageReferenceId = this.buildAiUsageReferenceId(route, publicTaskId);
-    const requestPath = this.stringOrUndefined(context.request_path) || null;
-    const userId = this.stringOrUndefined(context.user_id) || null;
-    const metadata = {
-      provider: ALIYUN_ICE_PROVIDER_TYPE,
-      task_kind: 'video_translation',
-      app_slug: route.app_slug,
-      model_key: route.model_key,
-      upstream_model: route.upstream_model,
-    };
-    const status = String(this.extractAliyunIceVideoTranslationStatus(response) || 'PENDING').toUpperCase().slice(0, 24);
-
-    const rows = await (this.prisma.$queryRawUnsafe(
-      `INSERT INTO ai_async_video_tasks (
-         id, app_id, user_id, public_task_id, external_task_id, source_id, model_id, model_key, upstream_model,
-         status, reservation_key, usage_reference_id, request_payload_json, response_json, request_path, metadata_json,
-         started_at
-       )
-       VALUES (
-         gen_random_uuid(), $1::uuid, $2::uuid, $3, $4, $5::uuid, $6::uuid, $7, $8,
-         $9, $10, $11, $12::jsonb, $13::jsonb, $14, $15::jsonb, now()
-       )
-       RETURNING *`,
-      route.app_id,
-      userId,
-      publicTaskId,
       this.normalizeNullableString(taskId, 128),
       route.source.id,
       route.model_id,
@@ -6798,178 +6416,6 @@ export class AiChatService implements OnModuleInit {
     }
   }
 
-  private async forwardAliyunIceVideoTranslationAsync(
-    route: ResolvedAiRoute,
-    payload: Record<string, unknown>,
-    context: AiInvocationContext,
-  ): Promise<ForwardedAiResponse> {
-    const startedAt = Date.now();
-    const requestPayload = this.buildAliyunIceVideoTranslationPayload(route, payload);
-    const release = await this.aiGatewayThrottle.acquire(route, context);
-    try {
-      const sdk = await this.loadAliyunIceSdk();
-      const client = this.createAliyunIceClient(route, sdk);
-      const request = new sdk.SubmitVideoTranslationJobRequest({
-        inputConfig: this.stringOrUndefined(requestPayload.InputConfig),
-        outputConfig: this.stringOrUndefined(requestPayload.OutputConfig),
-        editingConfig: this.stringOrUndefined(requestPayload.EditingConfig),
-        title: this.stringOrUndefined(requestPayload.Title),
-        description: this.stringOrUndefined(requestPayload.Description),
-        userData: this.stringOrUndefined(requestPayload.UserData),
-        clientToken: this.stringOrUndefined(requestPayload.ClientToken),
-      });
-      const response = await client.submitVideoTranslationJob(request);
-      const data = this.normalizeAliyunIceSdkResponse(response);
-      const success = data.success !== false;
-      const jobId = this.extractAliyunIceVideoTranslationJobId(data);
-      if (!success || !jobId) {
-        this.aiGatewayThrottle.recordFailure(route, null, this.extractAliyunIceVideoTranslationErrorMessage(data));
-        this.logUsageSafe(route, requestPayload, context, {
-          success: false,
-          is_stream: false,
-          usage: {},
-          request_id: this.stringOrUndefined(data.request_id),
-          latency_ms: Date.now() - startedAt,
-          error_message: this.truncate(this.extractAliyunIceVideoTranslationErrorMessage(data) || 'Aliyun ICE did not return JobId', 900),
-          billable: false,
-        });
-        throw new BadGatewayException(this.extractAliyunIceVideoTranslationErrorMessage(data) || 'Aliyun ICE video translation did not return JobId');
-      }
-      this.aiGatewayThrottle.recordSuccess(route);
-      return {
-        stream: false,
-        data: {
-          ...data,
-          task_id: jobId,
-          provider_task_id: jobId,
-          task_status: 'PENDING',
-        },
-      };
-    } catch (error: any) {
-      this.aiGatewayThrottle.recordFailure(route, this.numberOrNull(error?.status) ?? null, error?.message || null);
-      if (!(error instanceof BadGatewayException)) {
-        this.logUsageSafe(route, requestPayload, context, {
-          success: false,
-          is_stream: false,
-          usage: {},
-          latency_ms: Date.now() - startedAt,
-          error_message: this.truncate(String(error?.message || 'Aliyun ICE request failed'), 900),
-          billable: false,
-        });
-      }
-      throw error;
-    } finally {
-      release();
-    }
-  }
-
-  private async fetchAliyunIceVideoTranslationTaskData(
-    route: ResolvedAiRoute,
-    providerTaskId: string,
-  ): Promise<Record<string, unknown>> {
-    const taskId = this.stringOrUndefined(providerTaskId);
-    if (!taskId) {
-      throw new BadRequestException('provider task id is required');
-    }
-    const release = await this.aiGatewayThrottle.acquire(route, {});
-    try {
-      const sdk = await this.loadAliyunIceSdk();
-      const client = this.createAliyunIceClient(route, sdk);
-      const request = new sdk.GetSmartHandleJobRequest({ jobId: taskId });
-      const response = await client.getSmartHandleJob(request);
-      const data = this.normalizeAliyunIceSdkResponse(response);
-      this.aiGatewayThrottle.recordSuccess(route);
-      return data;
-    } catch (error: any) {
-      this.aiGatewayThrottle.recordFailure(route, this.numberOrNull(error?.status) ?? null, error?.message || null);
-      throw new BadGatewayException(`Aliyun ICE task query failed: ${error?.message || 'request failed'}`);
-    } finally {
-      release();
-    }
-  }
-
-  private async loadAliyunIceSdk(): Promise<any> {
-    const sdk = await import('@alicloud/ice20201109');
-    return sdk;
-  }
-
-  private createAliyunIceClient(route: ResolvedAiRoute, sdk: any): any {
-    const accessKeyId = this.stringOrUndefined(route.source.api_key);
-    const config = this.normalizeObject(route.source.custom_headers);
-    const accessKeySecret =
-      this.stringOrUndefined(config.access_key_secret)
-      || this.stringOrUndefined(config.accessKeySecret)
-      || this.stringOrUndefined(config.secret)
-      || this.stringOrUndefined(config.secret_key)
-      || this.stringOrUndefined(config.access_key);
-    if (!accessKeyId || !accessKeySecret) {
-      throw new BadRequestException('Aliyun ICE source requires api_key as AccessKeyId and custom_headers.access_key_secret');
-    }
-    const regionId =
-      this.stringOrUndefined(config.region_id)
-      || this.stringOrUndefined(config.regionId)
-      || this.extractAliyunRegionFromEndpoint(route.source.base_url)
-      || ALIYUN_ICE_DEFAULT_REGION;
-    const endpoint =
-      this.normalizeAliyunIceEndpoint(
-        this.stringOrUndefined(config.endpoint)
-        || this.stringOrUndefined(route.source.base_url)
-        || ALIYUN_ICE_DEFAULT_ENDPOINT,
-      );
-    const Client = sdk.default || sdk.Client || sdk;
-    return new Client({
-      accessKeyId,
-      accessKeySecret,
-      regionId,
-      endpoint,
-      protocol: 'HTTPS',
-      readTimeout: 30_000,
-      connectTimeout: 10_000,
-    });
-  }
-
-  private normalizeAliyunIceEndpoint(value: string): string {
-    return String(value || ALIYUN_ICE_DEFAULT_ENDPOINT)
-      .trim()
-      .replace(/^https?:\/\//i, '')
-      .replace(/\/+$/, '') || ALIYUN_ICE_DEFAULT_ENDPOINT;
-  }
-
-  private extractAliyunRegionFromEndpoint(value: string): string | null {
-    const endpoint = String(value || '').trim().toLowerCase();
-    const match = endpoint.match(/(?:^|\.)(cn-[a-z0-9-]+|ap-[a-z0-9-]+|us-[a-z0-9-]+|eu-[a-z0-9-]+)\.aliyuncs\.com/);
-    return match?.[1] || null;
-  }
-
-  private normalizeAliyunIceSdkResponse(response: any): Record<string, unknown> {
-    const rawBody = response?.body;
-    const body = this.normalizeObject(typeof rawBody?.toMap === 'function' ? rawBody.toMap() : rawBody);
-    const data = this.normalizeObject(body.Data ?? body.data);
-    const normalized: Record<string, unknown> = {
-      raw: body,
-      request_id: this.stringOrUndefined(body.RequestId) || this.stringOrUndefined(body.requestId),
-      success: body.Success ?? body.success,
-      job_id:
-        this.stringOrUndefined(body.JobId)
-        || this.stringOrUndefined(body.jobId)
-        || this.stringOrUndefined(data.JobId)
-        || this.stringOrUndefined(data.jobId),
-      state: this.stringOrUndefined(body.State) || this.stringOrUndefined(body.state),
-      error_code: this.stringOrUndefined(body.ErrorCode) || this.stringOrUndefined(body.errorCode),
-      error_message: this.stringOrUndefined(body.ErrorMessage) || this.stringOrUndefined(body.errorMessage),
-      output: body.Output ?? body.output,
-      user_data: body.UserData ?? body.userData,
-      job_result: body.JobResult ?? body.jobResult,
-      smart_job_info: body.SmartJobInfo ?? body.smartJobInfo,
-    };
-    Object.keys(normalized).forEach((key) => {
-      if (normalized[key] === undefined) {
-        delete normalized[key];
-      }
-    });
-    return normalized;
-  }
-
   private async buildSuccessfulForwardedResponse(
     route: ResolvedAiRoute,
     payload: Record<string, unknown>,
@@ -7256,9 +6702,6 @@ export class AiChatService implements OnModuleInit {
     if (route.capability !== 'image' && route.capability !== 'stt' && route.capability !== 'video') {
       return false;
     }
-    if (this.shouldUseAliyunIceVideoTranslation(route)) {
-      return false;
-    }
     if (this.isDashscopeNativeApiType(route.api_type)) {
       return true;
     }
@@ -7271,16 +6714,6 @@ export class AiChatService implements OnModuleInit {
 
     // DashScope sources always use native protocol for stt/image.
     return true;
-  }
-
-  private shouldUseAliyunIceVideoTranslation(route: ResolvedAiRoute): boolean {
-    if (route.capability !== 'video') {
-      return false;
-    }
-    const apiType = this.normalizeApiType(String(route.api_type || ''));
-    const providerType = this.normalizeApiType(route.source.provider_type);
-    return apiType === ALIYUN_ICE_VIDEO_TRANSLATION_API_TYPE
-      || providerType === ALIYUN_ICE_PROVIDER_TYPE;
   }
 
   private shouldUseDashscopeCompatibleStt(route: ResolvedAiRoute): boolean {
@@ -8811,7 +8244,6 @@ export class AiChatService implements OnModuleInit {
     return normalized === DASHSCOPE_NATIVE_IMAGE_API_TYPE
       || normalized === DASHSCOPE_NATIVE_STT_API_TYPE
       || normalized === DASHSCOPE_NATIVE_VIDEO_API_TYPE
-      || normalized === DASHSCOPE_VIDEORETALK_API_TYPE
       || normalized.startsWith('dashscope-native')
       || normalized.startsWith('aliyun-native');
   }
@@ -8945,11 +8377,6 @@ export class AiChatService implements OnModuleInit {
 
   private resolveDashscopeNativeVideoEndpoint(route: ResolvedAiRoute): string {
     const configured = this.normalizeEndpointPath(route.endpoint_path || '/videos/generations');
-    if (this.isDashscopeVideoRetalkRoute(route)) {
-      if (configured === '/videos/generations' || configured === '/v1/videos/generations') {
-        return DASHSCOPE_VIDEORETALK_ENDPOINT;
-      }
-    }
     if (configured === '/videos/generations' || configured === '/v1/videos/generations') {
       return DASHSCOPE_NATIVE_VIDEO_ENDPOINT;
     }
@@ -8968,16 +8395,6 @@ export class AiChatService implements OnModuleInit {
       return DASHSCOPE_NATIVE_VIDEO_ENDPOINT;
     }
     return normalized;
-  }
-
-  private isDashscopeVideoRetalkRoute(route: ResolvedAiRoute): boolean {
-    if (route.capability !== 'video') {
-      return false;
-    }
-    const apiType = this.normalizeApiType(String(route.api_type || ''));
-    const modelHints = `${String(route.model_key || '')} ${String(route.upstream_model || '')}`.toLowerCase();
-    return apiType === DASHSCOPE_VIDEORETALK_API_TYPE
-      || modelHints.replace(/[^a-z0-9]/g, '').includes(DASHSCOPE_VIDEORETALK_MODEL_KEY);
   }
 
   private normalizeDashscopeNativeBaseUrl(baseUrl: string): string {
@@ -9723,10 +9140,6 @@ export class AiChatService implements OnModuleInit {
       parameters.duration = this.normalizeDashscopeVideoDuration(requestedDuration);
     }
 
-    if (this.isDashscopeVideoRetalkRoute(route)) {
-      return this.buildDashscopeVideoRetalkPayload(route, payload, inputObject, parameters);
-    }
-
     const wan27Mode = this.resolveDashscopeWan27VideoMode(route);
     if (wan27Mode === 't2v') {
       if (!prompt) {
@@ -9857,110 +9270,6 @@ export class AiChatService implements OnModuleInit {
       input,
       parameters,
     };
-  }
-
-  private buildDashscopeVideoRetalkPayload(
-    route: ResolvedAiRoute,
-    payload: Record<string, unknown>,
-    inputObject: Record<string, unknown>,
-    parameters: Record<string, unknown>,
-  ): Record<string, unknown> {
-    const videoUrl =
-      this.stringOrUndefined(inputObject.video_url)
-      || this.stringOrUndefined(inputObject.videoUrl)
-      || this.stringOrUndefined(payload.video_url)
-      || this.stringOrUndefined(payload.videoUrl)
-      || this.stringOrUndefined(payload.video)
-      || this.stringOrUndefined(payload.input_video_url)
-      || this.stringOrUndefined(payload.inputVideoUrl);
-    const audioUrl =
-      this.stringOrUndefined(inputObject.audio_url)
-      || this.stringOrUndefined(inputObject.audioUrl)
-      || this.stringOrUndefined(payload.audio_url)
-      || this.stringOrUndefined(payload.audioUrl)
-      || this.stringOrUndefined(payload.audio)
-      || this.stringOrUndefined(payload.driving_audio_url)
-      || this.stringOrUndefined(payload.drivingAudioUrl);
-    const refImageUrl =
-      this.stringOrUndefined(inputObject.ref_image_url)
-      || this.stringOrUndefined(inputObject.refImageUrl)
-      || this.stringOrUndefined(payload.ref_image_url)
-      || this.stringOrUndefined(payload.refImageUrl)
-      || this.stringOrUndefined(payload.reference_image_url)
-      || this.stringOrUndefined(payload.referenceImageUrl);
-
-    if (!videoUrl) {
-      throw new BadRequestException('VideoRetalk 需要 input.video_url 或 video_url');
-    }
-    if (!audioUrl) {
-      throw new BadRequestException('VideoRetalk 需要 input.audio_url 或 audio_url');
-    }
-    this.assertDashscopeVideoRetalkDimensions(payload, inputObject);
-
-    const retalkParameters: Record<string, unknown> = {
-      ...parameters,
-    };
-    delete retalkParameters.resolution;
-    delete retalkParameters.duration;
-    delete retalkParameters.prompt_extend;
-    delete retalkParameters.watermark;
-    this.assignIfDefined(retalkParameters, 'video_extension', payload.video_extension ?? payload.videoExtension);
-    this.assignIfDefined(retalkParameters, 'query_face_threshold', payload.query_face_threshold ?? payload.queryFaceThreshold);
-
-    const input: Record<string, unknown> = {
-      ...inputObject,
-      video_url: videoUrl,
-      audio_url: audioUrl,
-    };
-    if (refImageUrl) {
-      input.ref_image_url = refImageUrl;
-    }
-    delete input.videoUrl;
-    delete input.audioUrl;
-    delete input.refImageUrl;
-    delete input.video_width;
-    delete input.videoWidth;
-    delete input.video_height;
-    delete input.videoHeight;
-    delete input.width;
-    delete input.height;
-
-    return {
-      model: route.upstream_model || DASHSCOPE_VIDEORETALK_MODEL_KEY,
-      input,
-      parameters: retalkParameters,
-    };
-  }
-
-  private assertDashscopeVideoRetalkDimensions(
-    payload: Record<string, unknown>,
-    inputObject: Record<string, unknown>,
-  ): void {
-    const width = this.numberOrNull(
-      inputObject.video_width,
-      inputObject.videoWidth,
-      inputObject.width,
-      payload.video_width,
-      payload.videoWidth,
-      payload.width,
-    );
-    const height = this.numberOrNull(
-      inputObject.video_height,
-      inputObject.videoHeight,
-      inputObject.height,
-      payload.video_height,
-      payload.videoHeight,
-      payload.height,
-    );
-    if (width === null && height === null) {
-      return;
-    }
-    if (width === null || height === null) {
-      throw new BadRequestException('VideoRetalk 需要同时提供 video_width 和 video_height，或不提供尺寸字段');
-    }
-    if (width < 640 || width > 2048 || height < 640 || height > 2048) {
-      throw new BadRequestException('VideoRetalk 输入视频宽高必须在 640 到 2048 之间；推荐 720x1280、1280x720 或 1024x1024');
-    }
   }
 
   private normalizeDashscopeVideoResolution(value: string): '720P' | '1080P' {
@@ -13800,15 +13109,6 @@ export class AiChatService implements OnModuleInit {
     if (capability !== 'video') {
       return this.defaultPublicModelPricingGroup(capability);
     }
-    const apiType = String(model.api_type || '').trim().toLowerCase();
-    const modelHints = `${String(model.model_key || '')} ${String(model.upstream_model || '')}`.toLowerCase();
-    const compactModelHints = modelHints.replace(/[^a-z0-9]/g, '');
-    if (apiType === ALIYUN_ICE_VIDEO_TRANSLATION_API_TYPE || compactModelHints.includes('aliyunvideotranslation')) {
-      return { type: 'video_translation', label: '视频翻译' };
-    }
-    if (apiType === DASHSCOPE_VIDEORETALK_API_TYPE || compactModelHints.includes(DASHSCOPE_VIDEORETALK_MODEL_KEY)) {
-      return { type: 'video_retalk', label: 'VideoRetalk' };
-    }
     return { type: 'video', label: '视频模型' };
   }
 
@@ -16907,303 +16207,6 @@ export class AiChatService implements OnModuleInit {
       return value as Record<string, unknown>;
     }
     return {};
-  }
-
-  private buildAliyunIceVideoTranslationPayload(
-    route: ResolvedAiRoute,
-    payload: Record<string, unknown>,
-  ): Record<string, unknown> {
-    if (this.stringOrUndefined(payload.InputConfig) || this.stringOrUndefined(payload.inputConfig)) {
-      return {
-        ...route.request_overrides,
-        ...payload,
-        InputConfig: this.stringOrUndefined(payload.InputConfig) || this.stringOrUndefined(payload.inputConfig),
-        OutputConfig: this.stringOrUndefined(payload.OutputConfig) || this.stringOrUndefined(payload.outputConfig),
-        EditingConfig: this.stringOrUndefined(payload.EditingConfig) || this.stringOrUndefined(payload.editingConfig),
-        Title: this.stringOrUndefined(payload.Title ?? payload.title),
-        Description: this.stringOrUndefined(payload.Description ?? payload.description),
-        UserData: this.stringifyJsonField(payload.UserData ?? payload.userData),
-        ClientToken: this.stringOrUndefined(payload.ClientToken ?? payload.clientToken),
-        duration_seconds: this.resolveDurationSecondsFromPayload(payload) ?? undefined,
-        resolution: this.resolveVideoResolutionFromPayload(payload) ?? undefined,
-      };
-    }
-
-    const input = this.normalizeObject(payload.input);
-    const output = this.normalizeObject(payload.output);
-    const editing = this.normalizeObject(payload.editing);
-    const inputType = this.normalizeAliyunIceInputType(payload.input_type ?? input.type ?? payload.type);
-    const inputValue =
-      this.stringOrUndefined(input.url)
-      || this.stringOrUndefined(input.media_url)
-      || this.stringOrUndefined(input.mediaUrl)
-      || this.stringOrUndefined(input.media_id)
-      || this.stringOrUndefined(input.mediaId)
-      || this.stringOrUndefined(input.video)
-      || this.stringOrUndefined(input.audio)
-      || this.stringOrUndefined(input.subtitle)
-      || this.stringOrUndefined(payload.video_url)
-      || this.stringOrUndefined(payload.audio_url)
-      || this.stringOrUndefined(payload.subtitle_url)
-      || this.stringOrUndefined(payload.input_url);
-    if (!inputValue) {
-      throw new BadRequestException('视频翻译需要 input.url 或 input.media_id');
-    }
-    const inputConfig: Record<string, unknown> = {
-      ...this.normalizeObject(payload.input_config),
-      ...this.normalizeObject(payload.inputConfig),
-      Type: inputType,
-      Media: inputValue,
-    };
-
-    const outputConfig = {
-      ...this.normalizeObject(payload.output_config),
-      ...this.normalizeObject(payload.outputConfig),
-      ...output,
-    };
-    const outputMediaUrl =
-      this.stringOrUndefined(outputConfig.MediaURL)
-      || this.stringOrUndefined(outputConfig.media_url)
-      || this.stringOrUndefined(outputConfig.mediaUrl)
-      || this.stringOrUndefined(payload.output_url);
-    const normalizedOutputConfig: Record<string, unknown> = {
-      ...outputConfig,
-      ...(outputMediaUrl ? { MediaURL: outputMediaUrl } : {}),
-    };
-    delete normalizedOutputConfig.media_url;
-    delete normalizedOutputConfig.mediaUrl;
-    if (!this.stringOrUndefined(normalizedOutputConfig.MediaURL) && !this.stringOrUndefined(normalizedOutputConfig.FileName)) {
-      throw new BadRequestException('视频翻译需要 output.media_url，或 VOD 输出参数');
-    }
-
-    const mode = String(payload.mode ?? payload.translation_mode ?? payload.translationMode ?? 'speech')
-      .trim()
-      .toLowerCase();
-    const sourceLanguage = this.stringOrUndefined(payload.source_language ?? payload.sourceLanguage ?? editing.SourceLanguage);
-    const targetLanguage = this.stringOrUndefined(payload.target_language ?? payload.targetLanguage ?? editing.TargetLanguage);
-    if (!sourceLanguage || !targetLanguage) {
-      throw new BadRequestException('视频翻译需要 source_language 和 target_language');
-    }
-    const editingConfig: Record<string, unknown> = {
-      ...this.normalizeObject(payload.editing_config),
-      ...this.normalizeObject(payload.editingConfig),
-      ...editing,
-      SourceLanguage: sourceLanguage,
-      TargetLanguage: targetLanguage,
-    };
-    this.assignIfDefined(editingConfig, 'DetextArea', payload.detext_area ?? payload.detextArea ?? editing.DetextArea);
-    this.assignIfDefined(editingConfig, 'SupportEditing', payload.support_editing ?? payload.supportEditing ?? editing.SupportEditing);
-    this.assignIfDefined(editingConfig, 'BilingualSubtitle', payload.bilingual_subtitle ?? payload.bilingualSubtitle ?? editing.BilingualSubtitle);
-    this.assignIfDefined(editingConfig, 'TextSource', payload.text_source ?? payload.textSource ?? editing.TextSource);
-    this.assignIfDefined(editingConfig, 'CustomParameter', payload.custom_parameter ?? payload.customParameter ?? editing.CustomParameter);
-    this.assignIfDefined(editingConfig, 'HotwordLibraryIdList', payload.hotword_library_id_list ?? payload.hotwordLibraryIdList ?? editing.HotwordLibraryIdList);
-    this.assignIfDefined(editingConfig, 'FECanvas', payload.fe_canvas ?? payload.feCanvas ?? editing.FECanvas);
-    if (mode === 'subtitle') {
-      editingConfig.NeedSpeechTranslate = false;
-      editingConfig.NeedFaceTranslate = false;
-      this.assignIfDefined(editingConfig, 'SubtitleTranslate', payload.subtitle_translate ?? payload.subtitleTranslate ?? editing.SubtitleTranslate);
-    } else if (mode === 'face') {
-      editingConfig.NeedSpeechTranslate = false;
-      editingConfig.NeedFaceTranslate = true;
-      this.assignIfDefined(editingConfig, 'FaceTranslate', payload.face_translate ?? payload.faceTranslate ?? editing.FaceTranslate);
-    } else {
-      editingConfig.NeedSpeechTranslate = true;
-      editingConfig.NeedFaceTranslate = false;
-      this.assignIfDefined(editingConfig, 'SpeechTranslate', payload.speech_translate ?? payload.speechTranslate ?? editing.SpeechTranslate);
-    }
-
-    const durationSeconds = this.resolveDurationSecondsFromPayload(payload);
-    const resolution = this.resolveVideoResolutionFromPayload(payload);
-    return {
-      ...route.request_overrides,
-      ...payload,
-      model: route.upstream_model,
-      InputConfig: JSON.stringify(inputConfig),
-      OutputConfig: JSON.stringify(this.compactObject(normalizedOutputConfig)),
-      EditingConfig: JSON.stringify(this.compactObject(editingConfig)),
-      Title: this.stringOrUndefined(payload.title ?? payload.Title),
-      Description: this.stringOrUndefined(payload.description ?? payload.Description),
-      UserData: this.stringifyJsonField(payload.user_data ?? payload.userData ?? payload.UserData),
-      ClientToken: this.stringOrUndefined(payload.client_token ?? payload.clientToken ?? payload.ClientToken),
-      duration_seconds: durationSeconds ?? undefined,
-      resolution: resolution ?? undefined,
-      parameters: {
-        ...this.normalizeObject(payload.parameters),
-        ...(durationSeconds !== null ? { duration_seconds: durationSeconds } : {}),
-        ...(resolution ? { resolution } : {}),
-      },
-    };
-  }
-
-  private normalizeAliyunIceInputType(value: unknown): 'Video' | 'Audio' | 'Subtitle' {
-    const normalized = String(value || 'Video').trim().toLowerCase();
-    if (normalized === 'audio') {
-      return 'Audio';
-    }
-    if (normalized === 'subtitle' || normalized === 'srt') {
-      return 'Subtitle';
-    }
-    return 'Video';
-  }
-
-  private assignIfDefined(target: Record<string, unknown>, key: string, value: unknown): void {
-    if (value !== undefined && value !== null && value !== '') {
-      target[key] = value;
-    }
-  }
-
-  private compactObject(value: Record<string, unknown>): Record<string, unknown> {
-    const output: Record<string, unknown> = {};
-    Object.entries(value).forEach(([key, item]) => {
-      if (item === undefined || item === null || item === '') {
-        return;
-      }
-      output[key] = item;
-    });
-    return output;
-  }
-
-  private stringifyJsonField(value: unknown): string | undefined {
-    const direct = this.stringOrUndefined(value);
-    if (direct) {
-      return direct;
-    }
-    if (value && typeof value === 'object') {
-      return JSON.stringify(value);
-    }
-    return undefined;
-  }
-
-  private extractAliyunIceVideoTranslationJobId(data: Record<string, unknown>): string | null {
-    const raw = this.normalizeObject(data.raw);
-    const rawData = this.normalizeObject(raw.Data ?? raw.data);
-    return this.stringOrUndefined(data.job_id)
-      || this.stringOrUndefined(data.task_id)
-      || this.stringOrUndefined(data.provider_task_id)
-      || this.stringOrUndefined(raw.JobId)
-      || this.stringOrUndefined(raw.jobId)
-      || this.stringOrUndefined(rawData.JobId)
-      || this.stringOrUndefined(rawData.jobId)
-      || null;
-  }
-
-  private extractAliyunIceVideoTranslationStatus(data: Record<string, unknown>): string | null {
-    const state =
-      this.stringOrUndefined(data.task_status)
-      || this.stringOrUndefined(data.state)
-      || this.stringOrUndefined(this.normalizeObject(data.raw).State)
-      || this.stringOrUndefined(this.normalizeObject(data.raw).state);
-    if (!state) {
-      return null;
-    }
-    const normalized = state.trim().toUpperCase();
-    if (normalized === 'FINISHED' || normalized === 'SUCCEEDED' || normalized === 'SUCCESS') {
-      return 'SUCCEEDED';
-    }
-    if (normalized === 'FAILED' || normalized === 'FAIL') {
-      return 'FAILED';
-    }
-    if (normalized === 'CREATED') {
-      return 'PENDING';
-    }
-    if (normalized === 'EXECUTING' || normalized === 'RUNNING') {
-      return 'RUNNING';
-    }
-    return normalized;
-  }
-
-  private isAliyunIceVideoTranslationTerminalSuccess(status: string): boolean {
-    return String(status || '').trim().toUpperCase() === 'SUCCEEDED';
-  }
-
-  private isAliyunIceVideoTranslationTerminalFailure(status: string): boolean {
-    return String(status || '').trim().toUpperCase() === 'FAILED';
-  }
-
-  private extractAliyunIceVideoTranslationErrorMessage(data: Record<string, unknown>): string | null {
-    const raw = this.normalizeObject(data.raw);
-    return this.stringOrUndefined(data.error_message)
-      || this.stringOrUndefined(raw.ErrorMessage)
-      || this.stringOrUndefined(raw.errorMessage)
-      || this.stringOrUndefined(data.error_code)
-      || this.stringOrUndefined(raw.ErrorCode)
-      || null;
-  }
-
-  private buildAliyunIceVideoTranslationSubmitResponse(
-    data: Record<string, unknown>,
-    options: { publicTaskId: string; providerTaskId: string },
-  ): Record<string, unknown> {
-    return {
-      created: Math.floor(Date.now() / 1000),
-      task_id: options.publicTaskId,
-      provider_task_id: options.providerTaskId,
-      upstream_task_id: options.providerTaskId,
-      task_status: 'PENDING',
-      request_id: this.stringOrUndefined(data.request_id) || undefined,
-    };
-  }
-
-  private buildAliyunIceVideoTranslationTaskResponse(
-    data: Record<string, unknown>,
-    options: { includeUrls: boolean; fallbackTaskId?: string | null; providerTaskId?: string | null },
-  ): Record<string, unknown> {
-    const providerTaskId = this.extractAliyunIceVideoTranslationJobId(data) || options.providerTaskId || null;
-    const taskStatus = this.extractAliyunIceVideoTranslationStatus(data) || null;
-    const response: Record<string, unknown> = {
-      created: Math.floor(Date.now() / 1000),
-      task_id: options.fallbackTaskId || providerTaskId,
-      provider_task_id: providerTaskId || undefined,
-      upstream_task_id: providerTaskId || undefined,
-      task_status: taskStatus,
-      request_id: this.stringOrUndefined(data.request_id) || undefined,
-    };
-    const message = this.extractAliyunIceVideoTranslationErrorMessage(data);
-    if (message) {
-      response.message = message;
-    }
-    if (options.includeUrls && taskStatus && this.isAliyunIceVideoTranslationTerminalSuccess(taskStatus)) {
-      const urls = this.extractAliyunIceVideoTranslationOutputUrls(data);
-      response.data = urls.map((url) => ({
-        url,
-        mime_type: url.toLowerCase().endsWith('.srt') ? 'text/plain' : 'video/mp4',
-      }));
-      if (urls[0]) {
-        response.video_url = urls[0];
-      }
-      const usage: Record<string, unknown> = {};
-      const durationSeconds = this.extractDurationSecondsFromData(data);
-      const resolution = this.extractVideoResolutionFromData(data);
-      if (durationSeconds !== null) {
-        usage.duration = durationSeconds;
-      }
-      if (resolution) {
-        usage.resolution = resolution;
-      }
-      if (Object.keys(usage).length > 0) {
-        response.usage = usage;
-      }
-    }
-    return response;
-  }
-
-  private extractAliyunIceVideoTranslationOutputUrls(data: Record<string, unknown>): string[] {
-    const raw = this.normalizeObject(data.raw);
-    const candidates = [
-      data.output,
-      data.job_result,
-      raw.Output,
-      raw.output,
-      raw.JobResult,
-      raw.jobResult,
-      this.normalizeObject(raw.JobResult ?? raw.jobResult).AiResult,
-      this.normalizeObject(raw.JobResult ?? raw.jobResult).aiResult,
-    ];
-    const urls = new Set<string>();
-    candidates.forEach((candidate) => {
-      this.collectUrlStrings(candidate, urls);
-    });
-    return Array.from(urls);
   }
 
   private collectUrlStrings(value: unknown, urls: Set<string>): void {
