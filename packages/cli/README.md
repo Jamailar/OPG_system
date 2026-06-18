@@ -4,6 +4,7 @@ CLI and Codex MCP bridge for OPG backend services.
 
 ```bash
 npm install -g @jamba/opg-cli
+opg --help
 opg init --base-url https://api.example.com
 opg login
 opg app create --name "Demo App" --slug demo
@@ -13,6 +14,15 @@ opg db smoke
 opg db manifest
 opg db query --sql "SELECT * FROM app_my_app__customers"
 opg codex install
+```
+
+Use `opg <command> --help` for command-specific help:
+
+```bash
+opg login --help
+opg app --help
+opg db --help
+opg platform --help
 ```
 
 ## Environment

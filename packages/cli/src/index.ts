@@ -44,6 +44,10 @@ main().catch((error) => {
 });
 
 async function main() {
+  if (isHelpRequest(args)) {
+    printHelp(resolveHelpTopic(args));
+    return;
+  }
   if (command === 'init') {
     await initProject(parseFlags(args.slice(1)));
     return;
@@ -81,6 +85,7 @@ async function main() {
     return;
   }
   printHelp();
+  process.exitCode = 1;
 }
 
 async function initProject(flags: Record<string, string>) {
@@ -1567,33 +1572,223 @@ function parseScopesFlag(flags: Record<string, string>) {
   return raw.split(',').map((item) => item.trim()).filter(Boolean);
 }
 
-function printHelp() {
-  console.log(`OPG CLI
+type HelpTopic = 'root' | 'init' | 'login' | 'app' | 'db' | 'platform' | 'codex' | 'mcp';
 
-Commands:
-  opg init --base-url <url>
-  opg login --base-url <url>
+function isHelpRequest(commandArgs: string[]) {
+  return commandArgs.length === 0 || commandArgs.some(isHelpToken);
+}
+
+function isHelpToken(value: string) {
+  return ['help', '--help', '-h', '-help'].includes(String(value || '').trim().toLowerCase());
+}
+
+function resolveHelpTopic(commandArgs: string[]): HelpTopic {
+  const firstTopic = commandArgs.find((item) => !isHelpToken(item) && !item.startsWith('-')) || '';
+  if (firstTopic === 'database') return 'db';
+  if (firstTopic === 'apps') return 'app';
+  if (['init', 'login', 'app', 'db', 'platform', 'codex', 'mcp'].includes(firstTopic)) {
+    return firstTopic as HelpTopic;
+  }
+  return 'root';
+}
+
+function printHelp(topic: HelpTopic = 'root') {
+  if (topic === 'init') {
+    console.log(`OPG CLI - init
+
+Usage:
+  opg init --base-url <url> [--profile <name>]
+  opg init --base-url <url> --app <slug> [--api-key <key>]
+
+Options:
+  --base-url <url>       OPG gateway base URL, for example https://opg.example.com
+  --app <slug>           Optional app slug. Omit for platform-first setup.
+  --profile <name>       Local credential profile name. Default: default
+  --api-key <key>        Optional app-scoped developer grant for non-browser setup.
+  --skip-manifest true   Skip fetching .opg/manifest.json during app setup.
+
+Examples:
+  opg init --base-url https://opg.example.com
+  opg init --base-url https://opg.example.com --app demo
+`);
+    return;
+  }
+
+  if (topic === 'login') {
+    console.log(`OPG CLI - login
+
+Usage:
+  opg login [--base-url <url>] [--profile <name>]
+  opg login --app <slug> [--scopes <csv>]
+
+Behavior:
+  Without --app, login creates a platform profile for app creation and control-plane work.
+  With --app, login creates an app-scoped SDK developer grant.
+
+Options:
+  --base-url <url>       OPG gateway base URL. Falls back to .opg config or OPG_BASE_URL.
+  --app <slug>           App slug for app-scoped SDK authorization.
+  --profile <name>       Local credential profile name. Default: default
+  --scopes <csv>         App SDK scopes for app-scoped login.
+  --web-url <url>        Browser UI base URL. Defaults to --base-url.
+  --open false           Print login URL without opening the browser.
+  --timeout <seconds>    Browser callback wait time. Default: 120
+
+Examples:
+  opg login
+  opg login --base-url https://opg.example.com
+  opg login --app demo --scopes database:read,database:write
+`);
+    return;
+  }
+
+  if (topic === 'app') {
+    console.log(`OPG CLI - app
+
+Usage:
   opg app list
   opg app create --name "Demo App" --slug demo
+  opg app create --json '{"name":"Demo App","slug":"demo"}'
   opg app use <slug>
-  opg login --app <slug> [--scopes <csv>]
-  opg init --base-url <url> --app <slug> [--api-key <key>]
-  opg init --base-url <url> --app <slug> --skip-manifest true
-  opg manifest --base-url <url> --app <slug>
-  opg smoke --base-url <url> --app <slug> --api-key <key>
-  opg platform apps list --base-url <url> --platform-token <jwt>
-  opg platform apps create --base-url <url> --platform-token <jwt> --json '{"name":"Demo","slug":"demo"}'
-  opg platform runtime get --base-url <url> --platform-token <jwt>
-  opg platform runtime update --base-url <url> --platform-token <jwt> --json '{"api_base_url":"https://opg.example.com"}'
-  opg platform request --path /storage/providers --method GET --base-url <url> --platform-token <jwt>
-  opg db smoke --base-url <url> --app <slug> --api-key <key>
-  opg db manifest --base-url <url> --app <slug> --api-key <key>
-  opg db tables --base-url <url> --app <slug> --api-key <key>
-  opg db describe <table> --base-url <url> --app <slug> --api-key <key>
-  opg db query --sql "SELECT * FROM app_demo__customers" --base-url <url> --app <slug> --api-key <key>
-  opg db execute --sql "CREATE TABLE ..." --dry-run true --base-url <url> --app <slug> --api-key <key>
+
+Options:
+  --base-url <url>       OPG gateway base URL.
+  --platform-token <jwt> Platform admin token. Usually loaded from opg login.
+  --profile <name>       Local credential profile name.
+  --include-inactive     Include inactive apps. Default: true
+
+Examples:
+  opg app list
+  opg app create --name "Demo App" --slug demo
+  opg app use demo
+`);
+    return;
+  }
+
+  if (topic === 'db') {
+    console.log(`OPG CLI - db
+
+Usage:
+  opg db smoke
+  opg db manifest
+  opg db tables
+  opg db describe <table>
+  opg db query --sql "SELECT * FROM app_demo__customers"
+  opg db execute --sql "CREATE TABLE ..." --dry-run true
+
+Options:
+  --base-url <url>       OPG gateway base URL.
+  --app <slug>           App slug.
+  --api-key <key>        App-scoped developer grant. Usually loaded from opg login --app.
+  --sql <sql>            SQL for query or execute.
+  --params <json>        Positional SQL params as JSON array.
+  --limit <number>       Query row limit.
+  --dry-run <bool>       Validate execute in a rolled-back transaction. Default is gateway-controlled.
+  --confirm <token>      Required by gateway when applying destructive changes.
+
+Examples:
+  opg db smoke
+  opg db describe app_demo__customers
+  opg db query --sql "SELECT * FROM app_demo__customers"
+`);
+    return;
+  }
+
+  if (topic === 'platform') {
+    console.log(`OPG CLI - platform
+
+Usage:
+  opg platform apps list
+  opg platform apps get --app-id <id>
+  opg platform apps create --json '{"name":"Demo","slug":"demo"}'
+  opg platform apps update --app-id <id> --json '{...}'
+  opg platform feedbacks list --app-id <id>
+  opg platform analytics users --app-id <id> --days 30
+  opg platform ai-usage logs --app-id <id> --days 7
+  opg platform payments orders --app-id <id>
+  opg platform runtime get
+  opg platform runtime update --json '{...}'
+  opg platform request --path /storage/providers --method GET
+
+Options:
+  --base-url <url>       OPG gateway base URL.
+  --platform-token <jwt> Platform admin token. Usually loaded from opg login.
+  --app-id <id>          Target tenant app id for app data operations.
+  --json <json>          Request body for create/update actions.
+  --query <json>         Query parameters as JSON object.
+  --method <method>      HTTP method for platform request. Default: GET
+  --path <path>          Path under /api/v1/platform-admin for platform request.
+
+Examples:
+  opg platform apps list
+  opg platform runtime get
+  opg platform request --path /storage/providers --method GET
+`);
+    return;
+  }
+
+  if (topic === 'codex') {
+    console.log(`OPG CLI - codex
+
+Usage:
   opg codex install [--base-url <url> --app <slug>]
+
+Options:
+  --base-url <url>       OPG gateway base URL.
+  --app <slug>           App slug for the MCP server.
+  --profile <name>       Local credential profile name.
+
+Example:
+  opg codex install
+`);
+    return;
+  }
+
+  if (topic === 'mcp') {
+    console.log(`OPG CLI - mcp
+
+Usage:
   opg mcp
+
+Description:
+  Starts the OPG MCP server over stdio for Codex or other MCP clients.
+  It reads .opg/credentials.json, .env.local, and .opg/opg.config.json.
+`);
+    return;
+  }
+
+  console.log(`OPG CLI
+
+Usage:
+  opg <command> [options]
+  opg help [command]
+  opg <command> --help
+
+Core commands:
+  init          Write .opg/opg.config.json and optional app SDK scaffold.
+  login         Browser login. Defaults to platform authorization; --app creates app SDK grant.
+  app           List, create, or select tenant apps.
+  manifest      Print current app SDK manifest.
+  smoke         Run app SDK smoke test.
+  db            Inspect or query app-owned database tables.
+  platform      Call platform control-plane APIs.
+  codex         Write Codex MCP config.
+  mcp           Start MCP server over stdio.
+
+Common flow:
+  opg init --base-url https://opg.example.com
+  opg login
+  opg app create --name "Demo App" --slug demo
+  opg login --app demo
+  opg db smoke
+  opg codex install
+
+Help:
+  opg --help
+  opg login --help
+  opg app --help
+  opg db --help
+  opg platform --help
 `);
 }
 
