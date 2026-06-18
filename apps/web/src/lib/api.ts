@@ -703,6 +703,30 @@ export interface PlatformEmailCfAccountItem {
   updated_at?: string | null;
 }
 
+export type PlatformEmailProviderType = 'CLOUDFLARE_EMAIL' | 'SMTP' | 'RESEND' | 'SENDGRID' | 'POSTMARK' | 'MAILGUN';
+
+export interface PlatformEmailProviderCatalogItem {
+  provider_type: PlatformEmailProviderType;
+  label: string;
+  required_config: string[];
+  required_secrets: string[];
+  optional_config: string[];
+}
+
+export interface PlatformEmailProviderItem {
+  id: string;
+  provider_type: PlatformEmailProviderType;
+  name: string;
+  external_account_id?: string | null;
+  status: 'ACTIVE' | 'INACTIVE';
+  config?: Record<string, any>;
+  cloudflare_account_id?: string | null;
+  notes?: string | null;
+  last_verified_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
 export interface PlatformEmailCloudflareTokenAccount {
   id: string;
   name: string;
@@ -719,7 +743,10 @@ export interface PlatformEmailCloudflareSendingDomain {
 
 export interface PlatformEmailSenderItem {
   id: string;
-  cf_account_id: string;
+  provider_id: string;
+  provider_name?: string | null;
+  provider_type?: PlatformEmailProviderType | null;
+  cf_account_id?: string | null;
   cf_account_name?: string | null;
   app_id?: string | null;
   app_slug?: string | null;
@@ -2740,6 +2767,58 @@ export const platformApi = {
     return response.data as { items: PlatformEmailCfAccountItem[] };
   },
 
+  listEmailProviderCatalog: async () => {
+    const response = await apiClient.getClient().get('/platform-admin/email/providers/catalog');
+    return response.data as { items: PlatformEmailProviderCatalogItem[] };
+  },
+
+  listEmailProviders: async () => {
+    const response = await apiClient.getClient().get('/platform-admin/email/providers');
+    return response.data as { items: PlatformEmailProviderItem[] };
+  },
+
+  createEmailProvider: async (payload: {
+    provider_type: PlatformEmailProviderType;
+    name?: string;
+    status?: 'ACTIVE' | 'INACTIVE';
+    config?: Record<string, unknown>;
+    secrets?: Record<string, unknown>;
+    notes?: string;
+    account_id?: string;
+    api_token?: string;
+  }) => {
+    const response = await apiClient.getClient().post('/platform-admin/email/providers', payload);
+    return response.data as PlatformEmailProviderItem;
+  },
+
+  updateEmailProvider: async (providerId: string, payload: Partial<{
+    name: string;
+    status: 'ACTIVE' | 'INACTIVE';
+    config: Record<string, unknown>;
+    secrets: Record<string, unknown>;
+    notes: string;
+    account_id: string;
+    api_token: string;
+  }>) => {
+    const response = await apiClient.getClient().patch(`/platform-admin/email/providers/${providerId}`, payload);
+    return response.data as PlatformEmailProviderItem;
+  },
+
+  deleteEmailProvider: async (providerId: string) => {
+    const response = await apiClient.getClient().delete(`/platform-admin/email/providers/${providerId}`);
+    return response.data as { deleted: boolean };
+  },
+
+  testEmailProvider: async (providerId: string) => {
+    const response = await apiClient.getClient().post(`/platform-admin/email/providers/${providerId}/test`);
+    return response.data as { ok: boolean };
+  },
+
+  listEmailProviderSendingDomains: async (providerId: string) => {
+    const response = await apiClient.getClient().get(`/platform-admin/email/providers/${providerId}/sending-domains`);
+    return response.data as { items: PlatformEmailCloudflareSendingDomain[] };
+  },
+
   createEmailCloudflareAccount: async (payload: {
     name?: string;
     account_id?: string;
@@ -2792,7 +2871,8 @@ export const platformApi = {
   },
 
   createEmailSender: async (payload: {
-    cf_account_id: string;
+    provider_id: string;
+    cf_account_id?: string;
     app_id?: string | null;
     email: string;
     display_name?: string;
@@ -2805,6 +2885,7 @@ export const platformApi = {
   },
 
   updateEmailSender: async (senderId: string, payload: Partial<{
+    provider_id: string;
     cf_account_id: string;
     app_id: string | null;
     email: string;

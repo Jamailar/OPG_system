@@ -1,14 +1,67 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto';
+import * as nodemailer from 'nodemailer';
 import { PrismaClient } from '@prisma/client';
 import { PRISMA_CLIENT } from '../../config/database.module';
 import { CloudflareEmailService } from './cloudflare-email.service';
+import { EmailProviderType } from './email-delivery.types';
 
 type Row = Record<string, any>;
 const EMAIL_DELIVERY_BATCH_SIZE = 20;
 const EMAIL_MAX_ATTEMPTS = 4;
 const EMAIL_MAX_CAMPAIGN_RECIPIENTS = 5000;
+const EMAIL_PROVIDER_TYPES: EmailProviderType[] = ['CLOUDFLARE_EMAIL', 'SMTP', 'RESEND', 'SENDGRID', 'POSTMARK', 'MAILGUN'];
+const EMAIL_PROVIDER_CATALOG: Array<{
+  provider_type: EmailProviderType;
+  label: string;
+  required_config: string[];
+  required_secrets: string[];
+  optional_config: string[];
+}> = [
+  {
+    provider_type: 'CLOUDFLARE_EMAIL',
+    label: 'Cloudflare Email Sending',
+    required_config: ['account_id'],
+    required_secrets: ['api_token'],
+    optional_config: [],
+  },
+  {
+    provider_type: 'SMTP',
+    label: 'SMTP',
+    required_config: ['host', 'port', 'secure'],
+    required_secrets: ['username', 'password'],
+    optional_config: [],
+  },
+  {
+    provider_type: 'RESEND',
+    label: 'Resend',
+    required_config: [],
+    required_secrets: ['api_key'],
+    optional_config: [],
+  },
+  {
+    provider_type: 'SENDGRID',
+    label: 'SendGrid',
+    required_config: [],
+    required_secrets: ['api_key'],
+    optional_config: [],
+  },
+  {
+    provider_type: 'POSTMARK',
+    label: 'Postmark',
+    required_config: [],
+    required_secrets: ['server_token'],
+    optional_config: [],
+  },
+  {
+    provider_type: 'MAILGUN',
+    label: 'Mailgun',
+    required_config: ['domain'],
+    required_secrets: ['api_key'],
+    optional_config: ['api_base_url'],
+  },
+];
 
 function asObject(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -34,8 +87,126 @@ export class EmailDeliveryService implements OnModuleInit {
     }
   }
 
+  getProviderCatalog() {
+    return { items: EMAIL_PROVIDER_CATALOG };
+  }
+
+  async listProviders() {
+    await this.ensureSchema();
+    await this.syncCloudflareProviders();
+    const rows = await this.prisma.$queryRaw<Row[]>`
+      SELECT p.id, p.provider_type, p.name, p.external_account_id, p.status, p.config_json,
+             p.cloudflare_account_id, p.notes, p.last_verified_at, p.created_at, p.updated_at,
+             a.account_id AS cf_account_id
+      FROM email_providers p
+      LEFT JOIN email_cf_accounts a ON a.id = p.cloudflare_account_id
+      ORDER BY p.updated_at DESC
+    `;
+    return { items: rows.map((row) => this.serializeProvider(row)) };
+  }
+
+  async createProvider(actorUserId: string, payload: unknown) {
+    await this.ensureSchema();
+    const body = asObject(payload);
+    const providerType = this.normalizeProviderType(body.provider_type || body.providerType);
+    if (providerType === 'CLOUDFLARE_EMAIL') {
+      const account = await this.createCloudflareAccount(actorUserId, body);
+      return this.getProviderByCloudflareAccountId(account.id);
+    }
+    const name = this.requiredString(body.name, 'name', 160);
+    const status = this.normalizeActiveStatus(body.status);
+    const notes = this.optionalString(body.notes, 4000);
+    const config = this.normalizeProviderConfig(providerType, asObject(body.config));
+    const secrets = this.normalizeProviderSecrets(providerType, asObject(body.secrets));
+    this.assertProviderReady(providerType, config, secrets);
+    const rows = await this.prisma.$queryRaw<Row[]>`
+      INSERT INTO email_providers (provider_type, name, external_account_id, status, config_json, secrets_ciphertext, notes, created_by_user_id)
+      VALUES (${providerType}, ${name}, ${this.providerExternalId(providerType, config)}, ${status}, ${JSON.stringify(config)}::jsonb, ${this.encryptSecret(JSON.stringify(secrets))}, ${notes}, ${actorUserId}::uuid)
+      RETURNING *
+    `;
+    return this.serializeProvider(rows[0]);
+  }
+
+  async updateProvider(providerId: string, payload: unknown) {
+    await this.ensureSchema();
+    const provider = await this.getProviderSecret(providerId);
+    if (provider.provider_type === 'CLOUDFLARE_EMAIL') {
+      return this.updateCloudflareAccount(provider.cloudflare_account_id || providerId, payload);
+    }
+    const body = asObject(payload);
+    const providerType = this.normalizeProviderType(provider.provider_type);
+    const currentConfig = asObject(provider.config_json);
+    const currentSecrets = provider.secrets_ciphertext ? this.decryptJsonSecret(provider.secrets_ciphertext) : {};
+    const config = body.config === undefined ? currentConfig : this.normalizeProviderConfig(providerType, { ...currentConfig, ...asObject(body.config) });
+    const secrets = body.secrets === undefined
+      ? currentSecrets
+      : this.normalizeProviderSecrets(providerType, { ...currentSecrets, ...asObject(body.secrets) });
+    this.assertProviderReady(providerType, config, secrets);
+    const name = body.name === undefined ? provider.name : this.requiredString(body.name, 'name', 160);
+    const status = body.status === undefined ? provider.status : this.normalizeActiveStatus(body.status);
+    const notes = body.notes === undefined ? provider.notes : this.optionalString(body.notes, 4000);
+    const rows = await this.prisma.$queryRaw<Row[]>`
+      UPDATE email_providers
+      SET name = ${name},
+          external_account_id = ${this.providerExternalId(providerType, config)},
+          status = ${status},
+          config_json = ${JSON.stringify(config)}::jsonb,
+          secrets_ciphertext = ${this.encryptSecret(JSON.stringify(secrets))},
+          notes = ${notes},
+          updated_at = now()
+      WHERE id = ${providerId}::uuid
+      RETURNING *
+    `;
+    if (!rows[0]) throw new NotFoundException('email provider not found');
+    return this.serializeProvider(rows[0]);
+  }
+
+  async deleteProvider(providerId: string) {
+    await this.ensureSchema();
+    const provider = await this.getProviderSecret(providerId);
+    if (provider.provider_type === 'CLOUDFLARE_EMAIL' && provider.cloudflare_account_id) {
+      return this.deleteCloudflareAccount(provider.cloudflare_account_id);
+    }
+    await this.prisma.$executeRaw`DELETE FROM email_providers WHERE id = ${providerId}::uuid`;
+    return { deleted: true };
+  }
+
+  async testProvider(providerId: string) {
+    await this.ensureSchema();
+    const provider = await this.getProviderSecret(providerId);
+    await this.verifyProvider(provider);
+    await this.prisma.$executeRaw`
+      UPDATE email_providers SET last_verified_at = now(), updated_at = now() WHERE id = ${providerId}::uuid
+    `;
+    if (provider.cloudflare_account_id) {
+      await this.prisma.$executeRaw`
+        UPDATE email_cf_accounts SET last_verified_at = now(), updated_at = now() WHERE id = ${provider.cloudflare_account_id}::uuid
+      `;
+    }
+    return { ok: true };
+  }
+
+  async listProviderSendingDomains(providerId: string) {
+    await this.ensureSchema();
+    const provider = await this.getProviderSecret(providerId);
+    if (provider.provider_type !== 'CLOUDFLARE_EMAIL') return { items: [] };
+    const accountId = String(provider.config_json?.account_id || provider.external_account_id || provider.cf_account_id || '');
+    const secrets = await this.getProviderSecrets(provider);
+    try {
+      const items = await this.cloudflareEmail.listSendingDomains(accountId, String(secrets.api_token || ''));
+      return { items };
+    } catch (error: any) {
+      this.logger.warn(`cloudflare sending domain discovery failed for ${accountId}: ${error?.message || error}`);
+      return {
+        items: [],
+        warning: 'cloudflare sending domain discovery failed',
+      };
+    }
+  }
+
   async listCloudflareAccounts() {
     await this.ensureSchema();
+    await this.syncCloudflareProviders();
     const rows = await this.prisma.$queryRaw<Row[]>`
       SELECT id, name, account_id, status, notes, last_verified_at, created_at, updated_at
       FROM email_cf_accounts
@@ -83,6 +254,7 @@ export class EmailDeliveryService implements OnModuleInit {
         updated_at = now()
       RETURNING id, name, account_id, status, notes, last_verified_at, created_at, updated_at
     `;
+    await this.syncCloudflareProviders();
     return rows[0];
   }
 
@@ -107,6 +279,7 @@ export class EmailDeliveryService implements OnModuleInit {
       RETURNING id, name, account_id, status, notes, last_verified_at, created_at, updated_at
     `;
     if (!rows[0]) throw new NotFoundException('cloudflare account not found');
+    await this.syncCloudflareProviders();
     return rows[0];
   }
 
@@ -121,6 +294,9 @@ export class EmailDeliveryService implements OnModuleInit {
     const account = await this.getCloudflareAccountSecret(accountUuid);
     const tokenStatus = await this.cloudflareEmail.verifyToken(this.decryptSecret(account.api_token_ciphertext));
     await this.prisma.$executeRaw`UPDATE email_cf_accounts SET last_verified_at = now(), updated_at = now() WHERE id = ${accountUuid}::uuid`;
+    await this.prisma.$executeRaw`
+      UPDATE email_providers SET last_verified_at = now(), updated_at = now() WHERE cloudflare_account_id = ${accountUuid}::uuid
+    `;
     return { ok: true, token: tokenStatus.result || {} };
   }
 
@@ -144,19 +320,26 @@ export class EmailDeliveryService implements OnModuleInit {
 
   async listSenders(appId?: string) {
     await this.ensureSchema();
+    await this.syncCloudflareProviders();
     const rows = appId
       ? await this.prisma.$queryRaw<Row[]>`
-          SELECT s.*, a.name AS cf_account_name, app.slug AS app_slug, app.name AS app_name
+          SELECT s.*, COALESCE(s.provider_id, p.id) AS provider_id,
+                 p.name AS provider_name, p.provider_type, p.cloudflare_account_id,
+                 a.name AS cf_account_name, app.slug AS app_slug, app.name AS app_name
           FROM email_senders s
-          JOIN email_cf_accounts a ON a.id = s.cf_account_id
+          LEFT JOIN email_providers p ON p.id = s.provider_id OR (s.provider_id IS NULL AND p.cloudflare_account_id = s.cf_account_id)
+          LEFT JOIN email_cf_accounts a ON a.id = s.cf_account_id OR a.id = p.cloudflare_account_id
           LEFT JOIN apps app ON app.id = s.app_id
           WHERE s.app_id IS NULL OR s.app_id = ${appId}::uuid
           ORDER BY s.updated_at DESC
         `
       : await this.prisma.$queryRaw<Row[]>`
-          SELECT s.*, a.name AS cf_account_name, app.slug AS app_slug, app.name AS app_name
+          SELECT s.*, COALESCE(s.provider_id, p.id) AS provider_id,
+                 p.name AS provider_name, p.provider_type, p.cloudflare_account_id,
+                 a.name AS cf_account_name, app.slug AS app_slug, app.name AS app_name
           FROM email_senders s
-          JOIN email_cf_accounts a ON a.id = s.cf_account_id
+          LEFT JOIN email_providers p ON p.id = s.provider_id OR (s.provider_id IS NULL AND p.cloudflare_account_id = s.cf_account_id)
+          LEFT JOIN email_cf_accounts a ON a.id = s.cf_account_id OR a.id = p.cloudflare_account_id
           LEFT JOIN apps app ON app.id = s.app_id
           ORDER BY s.updated_at DESC
         `;
@@ -166,7 +349,9 @@ export class EmailDeliveryService implements OnModuleInit {
   async createSender(actorUserId: string, payload: unknown) {
     await this.ensureSchema();
     const body = asObject(payload);
-    const cfAccountId = this.requiredString(body.cf_account_id || body.cfAccountId, 'cf_account_id', 80);
+    const providerId = this.requiredString(body.provider_id || body.providerId || body.cf_account_id || body.cfAccountId, 'provider_id', 80);
+    const provider = await this.getProviderSecret(providerId);
+    const cfAccountId = provider.cloudflare_account_id || null;
     const email = this.requiredEmail(body.email);
     const displayName = this.optionalString(body.display_name || body.displayName, 160);
     const domain = email.split('@')[1];
@@ -176,9 +361,10 @@ export class EmailDeliveryService implements OnModuleInit {
     const isDefault = Boolean(body.is_default || body.isDefault);
 
     const rows = await this.prisma.$queryRaw<Row[]>`
-      INSERT INTO email_senders (cf_account_id, app_id, email, display_name, domain, purpose, status, is_default, created_by_user_id)
-      VALUES (${cfAccountId}::uuid, ${appId}::uuid, ${email}, ${displayName}, ${domain}, ${purpose}, ${status}, ${isDefault}, ${actorUserId}::uuid)
+      INSERT INTO email_senders (provider_id, cf_account_id, app_id, email, display_name, domain, purpose, status, is_default, created_by_user_id)
+      VALUES (${provider.id}::uuid, ${cfAccountId}::uuid, ${appId}::uuid, ${email}, ${displayName}, ${domain}, ${purpose}, ${status}, ${isDefault}, ${actorUserId}::uuid)
       ON CONFLICT (LOWER(email)) DO UPDATE SET
+        provider_id = EXCLUDED.provider_id,
         cf_account_id = EXCLUDED.cf_account_id,
         app_id = EXCLUDED.app_id,
         display_name = EXCLUDED.display_name,
@@ -196,7 +382,9 @@ export class EmailDeliveryService implements OnModuleInit {
     await this.ensureSchema();
     const current = await this.getSender(senderId);
     const body = asObject(payload);
-    const cfAccountId = this.optionalUuid(body.cf_account_id || body.cfAccountId) || current.cf_account_id;
+    const providerId = this.optionalUuid(body.provider_id || body.providerId || body.cf_account_id || body.cfAccountId) || current.provider_id;
+    const provider = providerId ? await this.getProviderSecret(providerId) : null;
+    const cfAccountId = provider?.cloudflare_account_id || current.cf_account_id || null;
     const email = body.email === undefined ? current.email : this.requiredEmail(body.email);
     const displayName = body.display_name === undefined && body.displayName === undefined ? current.display_name : this.optionalString(body.display_name || body.displayName, 160);
     const domain = email.split('@')[1];
@@ -207,7 +395,8 @@ export class EmailDeliveryService implements OnModuleInit {
 
     const rows = await this.prisma.$queryRaw<Row[]>`
       UPDATE email_senders
-      SET cf_account_id = ${cfAccountId}::uuid,
+      SET provider_id = ${providerId}::uuid,
+          cf_account_id = ${cfAccountId}::uuid,
           app_id = ${appId}::uuid,
           email = ${email},
           display_name = ${displayName},
@@ -567,7 +756,7 @@ export class EmailDeliveryService implements OnModuleInit {
     const htmlFooter = `${footer ? `<p>${this.escapeHtml(footer)}</p>` : ''}<p><a href="${unsubscribeUrl}">退订</a></p>`;
     const textFooter = `${footer ? `\n\n${footer}` : ''}\n\n退订：${unsubscribeUrl}`;
     try {
-      const result = await this.cloudflareEmail.send(item.cf_account_id, this.decryptSecret(item.api_token_ciphertext), {
+      const result = await this.dispatchEmail(item, {
         from: item.sender_display_name ? { address: item.sender_email, name: item.sender_display_name } : item.sender_email,
         to: [item.email_snapshot],
         subject: item.subject,
@@ -576,8 +765,9 @@ export class EmailDeliveryService implements OnModuleInit {
         reply_to: this.normalizeEmail(item.reply_to_email) || undefined,
         headers: { 'List-Unsubscribe': `<${unsubscribeUrl}>` },
       });
-      const delivered = result.result?.delivered || [];
-      const bounced = result.result?.permanent_bounces || [];
+      const deliveryResult = result.result || {};
+      const delivered = deliveryResult.delivered || [];
+      const bounced = 'permanent_bounces' in deliveryResult ? deliveryResult.permanent_bounces || [] : [];
       const status = bounced.some((email) => email.toLowerCase() === String(item.email_snapshot).toLowerCase()) ? 'bounced' : 'delivered';
       await this.prisma.$executeRaw`
         UPDATE email_campaign_recipients
@@ -598,13 +788,13 @@ export class EmailDeliveryService implements OnModuleInit {
         FROM email_campaign_recipients r
         JOIN email_campaigns c ON c.id = r.campaign_id
         JOIN email_senders s ON s.id = c.sender_id
-        JOIN email_cf_accounts a ON a.id = s.cf_account_id
+        JOIN email_providers p ON p.id = s.provider_id OR (s.provider_id IS NULL AND p.cloudflare_account_id = s.cf_account_id)
         WHERE r.status IN ('pending', 'retry')
           AND COALESCE(r.next_retry_at, now()) <= now()
           AND c.status IN ('scheduled', 'sending')
           AND COALESCE(c.scheduled_at, now()) <= now()
           AND s.status = 'ACTIVE'
-          AND a.status = 'ACTIVE'
+          AND p.status = 'ACTIVE'
         ORDER BY r.created_at
         LIMIT ${EMAIL_DELIVERY_BATCH_SIZE}
         FOR UPDATE SKIP LOCKED
@@ -620,13 +810,15 @@ export class EmailDeliveryService implements OnModuleInit {
             updated_at = now()
         FROM email_campaigns c
         JOIN email_senders s ON s.id = c.sender_id
-        JOIN email_cf_accounts a ON a.id = s.cf_account_id
+        JOIN email_providers p ON p.id = s.provider_id OR (s.provider_id IS NULL AND p.cloudflare_account_id = s.cf_account_id)
+        LEFT JOIN email_cf_accounts a ON a.id = p.cloudflare_account_id
         LEFT JOIN app_email_settings es ON es.app_id = c.app_id
         WHERE r.campaign_id = c.id
           AND r.id = ANY(${ids}::uuid[])
         RETURNING r.id, r.email_snapshot, r.display_name_snapshot, r.attempt_count,
                   c.id AS campaign_id, c.app_id, c.subject, c.html, c.text,
                   s.id AS sender_id, s.email AS sender_email, s.display_name AS sender_display_name,
+                  p.id AS provider_id, p.provider_type, p.external_account_id, p.config_json, p.secrets_ciphertext, p.cloudflare_account_id,
                   a.account_id AS cf_account_id, a.api_token_ciphertext,
                   es.reply_to_email, es.footer_text
       `;
@@ -674,7 +866,7 @@ export class EmailDeliveryService implements OnModuleInit {
   }
 
   private async sendWithSender(sender: Row, to: string, message: { subject: string; html?: string; text?: string }) {
-    return this.cloudflareEmail.send(sender.cf_account_id, this.decryptSecret(sender.api_token_ciphertext), {
+    return this.dispatchEmail(sender, {
       from: sender.display_name ? { address: sender.email, name: sender.display_name } : sender.email,
       to: [to],
       subject: message.subject,
@@ -726,8 +918,11 @@ export class EmailDeliveryService implements OnModuleInit {
 
   private async getSenderWithAccount(senderId: string) {
     const rows = await this.prisma.$queryRaw<Row[]>`
-      SELECT s.*, a.account_id AS cf_account_id, a.api_token_ciphertext
-      FROM email_senders s JOIN email_cf_accounts a ON a.id = s.cf_account_id
+      SELECT s.*, p.id AS provider_id, p.provider_type, p.external_account_id, p.config_json, p.secrets_ciphertext, p.cloudflare_account_id,
+             a.account_id AS cf_account_id, a.api_token_ciphertext
+      FROM email_senders s
+      JOIN email_providers p ON p.id = s.provider_id OR (s.provider_id IS NULL AND p.cloudflare_account_id = s.cf_account_id)
+      LEFT JOIN email_cf_accounts a ON a.id = p.cloudflare_account_id
       WHERE s.id = ${senderId}::uuid
     `;
     if (!rows[0]) throw new NotFoundException('email sender not found');
@@ -736,17 +931,149 @@ export class EmailDeliveryService implements OnModuleInit {
 
   private async requireSenderForApp(senderId: string, appId: string, purpose?: 'marketing' | 'notification') {
     const rows = await this.prisma.$queryRaw<Row[]>`
-      SELECT s.*, a.account_id AS cf_account_id, a.api_token_ciphertext
+      SELECT s.*, p.id AS provider_id, p.provider_type, p.external_account_id, p.config_json, p.secrets_ciphertext, p.cloudflare_account_id,
+             a.account_id AS cf_account_id, a.api_token_ciphertext
       FROM email_senders s
-      JOIN email_cf_accounts a ON a.id = s.cf_account_id
+      JOIN email_providers p ON p.id = s.provider_id OR (s.provider_id IS NULL AND p.cloudflare_account_id = s.cf_account_id)
+      LEFT JOIN email_cf_accounts a ON a.id = p.cloudflare_account_id
       WHERE s.id = ${senderId}::uuid
         AND (s.app_id IS NULL OR s.app_id = ${appId}::uuid)
         AND s.status = 'ACTIVE'
-        AND a.status = 'ACTIVE'
+        AND p.status = 'ACTIVE'
         AND (${purpose || null}::text IS NULL OR s.purpose IN (${purpose || null}, 'both'))
     `;
     if (!rows[0]) throw new BadRequestException('email sender is not available for this app');
     return rows[0];
+  }
+
+  private async dispatchEmail(sender: Row, payload: {
+    from: string | { address: string; name?: string };
+    to: string[];
+    subject: string;
+    html?: string;
+    text?: string;
+    reply_to?: string;
+    headers?: Record<string, string>;
+  }) {
+    const providerType = this.normalizeProviderType(sender.provider_type || 'CLOUDFLARE_EMAIL');
+    const config = asObject(sender.config_json);
+    const secrets = await this.getProviderSecrets(sender);
+    if (providerType === 'CLOUDFLARE_EMAIL') {
+      const accountId = String(config.account_id || sender.external_account_id || sender.cf_account_id || '');
+      return this.cloudflareEmail.send(accountId, String(secrets.api_token || ''), payload);
+    }
+    if (providerType === 'SMTP') return this.sendViaSmtp(config, secrets, payload);
+    if (providerType === 'RESEND') return this.sendViaResend(secrets, payload);
+    if (providerType === 'SENDGRID') return this.sendViaSendGrid(secrets, payload);
+    if (providerType === 'POSTMARK') return this.sendViaPostmark(secrets, payload);
+    if (providerType === 'MAILGUN') return this.sendViaMailgun(config, secrets, payload);
+    throw new BadRequestException('unsupported email provider');
+  }
+
+  private async sendViaSmtp(config: Row, secrets: Row, payload: {
+    from: string | { address: string; name?: string };
+    to: string[];
+    subject: string;
+    html?: string;
+    text?: string;
+    reply_to?: string;
+    headers?: Record<string, string>;
+  }) {
+    const transporter = nodemailer.createTransport({
+      host: String(config.host || ''),
+      port: Number(config.port || 465),
+      secure: config.secure === false || config.secure === 'false' ? false : true,
+      auth: {
+        user: String(secrets.username || ''),
+        pass: String(secrets.password || ''),
+      },
+    });
+    const info = await transporter.sendMail({
+      from: this.formatEmailAddress(payload.from),
+      to: payload.to.join(','),
+      subject: payload.subject,
+      html: payload.html,
+      text: payload.text,
+      replyTo: payload.reply_to,
+      headers: payload.headers,
+    });
+    return { success: true, result: { delivered: [String(info.messageId || '')].filter(Boolean) } };
+  }
+
+  private async sendViaResend(secrets: Row, payload: Row) {
+    const response = await this.httpJson('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${secrets.api_key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: this.formatEmailAddress(payload.from),
+        to: payload.to,
+        subject: payload.subject,
+        html: payload.html,
+        text: payload.text,
+        reply_to: payload.reply_to,
+        headers: payload.headers,
+      }),
+    }, 'Resend');
+    return { success: true, result: { delivered: [String(response.id || '')].filter(Boolean) } };
+  }
+
+  private async sendViaSendGrid(secrets: Row, payload: Row) {
+    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${secrets.api_key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        personalizations: [{ to: payload.to.map((email: string) => ({ email })) }],
+        from: this.toSendGridAddress(payload.from),
+        reply_to: payload.reply_to ? { email: payload.reply_to } : undefined,
+        subject: payload.subject,
+        content: [
+          payload.text ? { type: 'text/plain', value: payload.text } : null,
+          payload.html ? { type: 'text/html', value: payload.html } : null,
+        ].filter(Boolean),
+        headers: payload.headers,
+      }),
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new BadRequestException(`SendGrid email send failed: ${text || response.status}`);
+    }
+    return { success: true, result: { delivered: [response.headers.get('x-message-id') || ''].filter(Boolean) } };
+  }
+
+  private async sendViaPostmark(secrets: Row, payload: Row) {
+    const response = await this.httpJson('https://api.postmarkapp.com/email', {
+      method: 'POST',
+      headers: { 'X-Postmark-Server-Token': String(secrets.server_token || ''), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        From: this.formatEmailAddress(payload.from),
+        To: payload.to.join(','),
+        Subject: payload.subject,
+        HtmlBody: payload.html,
+        TextBody: payload.text,
+        ReplyTo: payload.reply_to,
+        Headers: Object.entries(payload.headers || {}).map(([Name, Value]) => ({ Name, Value })),
+      }),
+    }, 'Postmark');
+    return { success: true, result: { delivered: [String(response.MessageID || '')].filter(Boolean) } };
+  }
+
+  private async sendViaMailgun(config: Row, secrets: Row, payload: Row) {
+    const domain = this.requiredString(config.domain, 'mailgun domain', 255);
+    const baseUrl = String(config.api_base_url || 'https://api.mailgun.net').replace(/\/+$/, '');
+    const form = new URLSearchParams();
+    form.set('from', this.formatEmailAddress(payload.from));
+    for (const email of payload.to || []) form.append('to', email);
+    form.set('subject', payload.subject);
+    if (payload.html) form.set('html', payload.html);
+    if (payload.text) form.set('text', payload.text);
+    if (payload.reply_to) form.set('h:Reply-To', payload.reply_to);
+    for (const [key, value] of Object.entries(payload.headers || {})) form.set(`h:${key}`, String(value));
+    const response = await this.httpJson(`${baseUrl}/v3/${encodeURIComponent(domain)}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Basic ${Buffer.from(`api:${secrets.api_key}`).toString('base64')}` },
+      body: form,
+    }, 'Mailgun');
+    return { success: true, result: { delivered: [String(response.id || '')].filter(Boolean) } };
   }
 
   private async getCampaign(appId: string, campaignId: string) {
@@ -836,6 +1163,203 @@ export class EmailDeliveryService implements OnModuleInit {
         const [email, ...nameParts] = line.split(/[,，\t]/).map((part) => part.trim());
         return { email, display_name: nameParts.join(' ') || undefined };
       });
+  }
+
+  private async syncCloudflareProviders() {
+    await this.prisma.$executeRaw`
+      INSERT INTO email_providers (
+        provider_type, name, external_account_id, status, config_json, cloudflare_account_id,
+        notes, last_verified_at, created_by_user_id, created_at, updated_at
+      )
+      SELECT 'CLOUDFLARE_EMAIL', a.name, a.account_id, a.status, jsonb_build_object('account_id', a.account_id),
+             a.id, a.notes, a.last_verified_at, a.created_by_user_id, a.created_at, a.updated_at
+      FROM email_cf_accounts a
+      ON CONFLICT (cloudflare_account_id) WHERE cloudflare_account_id IS NOT NULL DO UPDATE SET
+        name = EXCLUDED.name,
+        external_account_id = EXCLUDED.external_account_id,
+        status = EXCLUDED.status,
+        config_json = EXCLUDED.config_json,
+        notes = EXCLUDED.notes,
+        last_verified_at = EXCLUDED.last_verified_at,
+        updated_at = now()
+    `;
+    await this.prisma.$executeRaw`
+      UPDATE email_senders s
+      SET provider_id = p.id
+      FROM email_providers p
+      WHERE p.cloudflare_account_id = s.cf_account_id
+        AND s.provider_id IS NULL
+    `;
+  }
+
+  private serializeProvider(row: Row) {
+    const config = asObject(row.config_json);
+    return {
+      id: row.id,
+      provider_type: row.provider_type,
+      name: row.name,
+      external_account_id: row.external_account_id || row.cf_account_id || null,
+      status: row.status,
+      config,
+      cloudflare_account_id: row.cloudflare_account_id || null,
+      notes: row.notes || null,
+      last_verified_at: row.last_verified_at || null,
+      created_at: row.created_at || null,
+      updated_at: row.updated_at || null,
+    };
+  }
+
+  private async getProviderByCloudflareAccountId(accountId: string) {
+    await this.syncCloudflareProviders();
+    const rows = await this.prisma.$queryRaw<Row[]>`
+      SELECT p.*, a.account_id AS cf_account_id
+      FROM email_providers p
+      LEFT JOIN email_cf_accounts a ON a.id = p.cloudflare_account_id
+      WHERE p.cloudflare_account_id = ${accountId}::uuid
+      LIMIT 1
+    `;
+    if (!rows[0]) throw new NotFoundException('email provider not found');
+    return this.serializeProvider(rows[0]);
+  }
+
+  private async getProviderSecret(providerId: string) {
+    const rows = await this.prisma.$queryRaw<Row[]>`
+      SELECT p.*, a.account_id AS cf_account_id, a.api_token_ciphertext
+      FROM email_providers p
+      LEFT JOIN email_cf_accounts a ON a.id = p.cloudflare_account_id
+      WHERE p.id = ${providerId}::uuid OR p.cloudflare_account_id = ${providerId}::uuid
+      LIMIT 1
+    `;
+    if (!rows[0]) throw new NotFoundException('email provider not found');
+    return rows[0];
+  }
+
+  private async getProviderSecrets(provider: Row) {
+    if (provider.provider_type === 'CLOUDFLARE_EMAIL' && provider.api_token_ciphertext) {
+      return { api_token: this.decryptSecret(provider.api_token_ciphertext) };
+    }
+    if (!provider.secrets_ciphertext) return {};
+    return this.decryptJsonSecret(provider.secrets_ciphertext);
+  }
+
+  private decryptJsonSecret(value: string) {
+    try {
+      return asObject(JSON.parse(this.decryptSecret(value)));
+    } catch {
+      throw new BadRequestException('invalid encrypted provider secrets');
+    }
+  }
+
+  private normalizeProviderType(value: unknown): EmailProviderType {
+    const normalized = String(value || 'CLOUDFLARE_EMAIL').toUpperCase();
+    if (EMAIL_PROVIDER_TYPES.includes(normalized as EmailProviderType)) return normalized as EmailProviderType;
+    throw new BadRequestException('unsupported email provider type');
+  }
+
+  private normalizeProviderConfig(providerType: EmailProviderType, input: Row) {
+    if (providerType === 'SMTP') {
+      return {
+        host: this.optionalString(input.host, 255),
+        port: Number(input.port || 465),
+        secure: input.secure === false || input.secure === 'false' ? false : true,
+      };
+    }
+    if (providerType === 'MAILGUN') {
+      return {
+        domain: this.optionalString(input.domain, 255),
+        api_base_url: this.optionalString(input.api_base_url || input.apiBaseUrl, 255) || 'https://api.mailgun.net',
+      };
+    }
+    return {};
+  }
+
+  private normalizeProviderSecrets(providerType: EmailProviderType, input: Row) {
+    if (providerType === 'SMTP') {
+      return {
+        username: this.optionalString(input.username, 512),
+        password: this.optionalString(input.password, 2048),
+      };
+    }
+    if (providerType === 'POSTMARK') {
+      return { server_token: this.optionalString(input.server_token || input.serverToken, 2048) };
+    }
+    return { api_key: this.optionalString(input.api_key || input.apiKey, 2048) };
+  }
+
+  private assertProviderReady(providerType: EmailProviderType, config: Row, secrets: Row) {
+    const spec = EMAIL_PROVIDER_CATALOG.find((item) => item.provider_type === providerType);
+    const missing = [
+      ...(spec?.required_config || []).filter((key) => config[key] === null || config[key] === undefined || config[key] === ''),
+      ...(spec?.required_secrets || []).filter((key) => secrets[key] === null || secrets[key] === undefined || secrets[key] === ''),
+    ];
+    if (missing.length) throw new BadRequestException(`email provider missing required fields: ${missing.join(', ')}`);
+  }
+
+  private providerExternalId(providerType: EmailProviderType, config: Row) {
+    if (providerType === 'MAILGUN') return this.optionalString(config.domain, 160);
+    if (providerType === 'SMTP') return this.optionalString(config.host, 160);
+    return null;
+  }
+
+  private async verifyProvider(provider: Row) {
+    const providerType = this.normalizeProviderType(provider.provider_type);
+    const config = asObject(provider.config_json);
+    const secrets = await this.getProviderSecrets(provider);
+    this.assertProviderReady(providerType, providerType === 'CLOUDFLARE_EMAIL' ? { account_id: provider.external_account_id || config.account_id } : config, secrets);
+    if (providerType === 'CLOUDFLARE_EMAIL') {
+      await this.cloudflareEmail.verifyToken(String(secrets.api_token || ''));
+      return;
+    }
+    if (providerType === 'SMTP') {
+      const transporter = nodemailer.createTransport({
+        host: String(config.host || ''),
+        port: Number(config.port || 465),
+        secure: config.secure === false || config.secure === 'false' ? false : true,
+        auth: { user: String(secrets.username || ''), pass: String(secrets.password || '') },
+      });
+      await transporter.verify();
+      return;
+    }
+    if (providerType === 'RESEND') {
+      await this.httpJson('https://api.resend.com/domains', { headers: { Authorization: `Bearer ${secrets.api_key}` } }, 'Resend');
+      return;
+    }
+    if (providerType === 'SENDGRID') {
+      await this.httpJson('https://api.sendgrid.com/v3/scopes', { headers: { Authorization: `Bearer ${secrets.api_key}` } }, 'SendGrid');
+      return;
+    }
+    if (providerType === 'POSTMARK') {
+      await this.httpJson('https://api.postmarkapp.com/server', { headers: { 'X-Postmark-Server-Token': String(secrets.server_token || '') } }, 'Postmark');
+      return;
+    }
+    if (providerType === 'MAILGUN') {
+      const baseUrl = String(config.api_base_url || 'https://api.mailgun.net').replace(/\/+$/, '');
+      const domain = this.requiredString(config.domain, 'mailgun domain', 255);
+      await this.httpJson(`${baseUrl}/v3/domains/${encodeURIComponent(domain)}`, {
+        headers: { Authorization: `Basic ${Buffer.from(`api:${secrets.api_key}`).toString('base64')}` },
+      }, 'Mailgun');
+    }
+  }
+
+  private async httpJson(url: string, init: RequestInit, providerLabel: string) {
+    const response = await fetch(url, init);
+    const data = await response.json().catch(async () => ({ message: await response.text().catch(() => '') }));
+    if (!response.ok) {
+      const message = data?.message || data?.error || data?.errors?.[0]?.message || `${providerLabel} API failed with HTTP ${response.status}`;
+      throw new BadRequestException(`${providerLabel} API failed: ${message}`);
+    }
+    return data as Row;
+  }
+
+  private formatEmailAddress(value: string | { address: string; name?: string }) {
+    if (typeof value === 'string') return value;
+    if (!value.name) return value.address;
+    return `${value.name.replace(/"/g, '\\"')} <${value.address}>`;
+  }
+
+  private toSendGridAddress(value: string | { address: string; name?: string }) {
+    if (typeof value === 'string') return { email: value };
+    return { email: value.address, name: value.name };
   }
 
   private encryptSecret(value: string) {
@@ -952,7 +1476,7 @@ export class EmailDeliveryService implements OnModuleInit {
     if (this.schemaReady) return;
     if (!this.schemaPromise) {
       this.schemaPromise = this.prisma
-        .$queryRaw`SELECT 1 FROM email_cf_accounts LIMIT 1`
+        .$queryRaw`SELECT 1 FROM email_providers LIMIT 1`
         .then(() => {
           this.schemaReady = true;
         })

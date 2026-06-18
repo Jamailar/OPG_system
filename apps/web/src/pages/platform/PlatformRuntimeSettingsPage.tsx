@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   PlatformIntegrationApiKeyItem,
   PlatformRuntimeSettings,
-  PlatformSmtpProviderItem,
   platformApi,
 } from '@/lib/api';
 import { pickApiErrorMessage } from '@/lib/api-response';
@@ -20,18 +19,6 @@ type RuntimeSettingsForm = {
   integration_settings_text: string;
 };
 
-type SmtpProviderForm = {
-  id: string;
-  name: string;
-  host: string;
-  port: string;
-  secure: boolean;
-  from_email: string;
-  from_name: string;
-  username: string;
-  password: string;
-};
-
 const EMPTY_FORM: RuntimeSettingsForm = {
   api_base_url: '',
   admin_frontend_url: '',
@@ -41,18 +28,6 @@ const EMPTY_FORM: RuntimeSettingsForm = {
   ai_gateway_tuning_text: '{}',
   oauth_settings_text: '{}',
   integration_settings_text: '{}',
-};
-
-const EMPTY_SMTP_FORM: SmtpProviderForm = {
-  id: '',
-  name: 'Default SMTP',
-  host: '',
-  port: '465',
-  secure: true,
-  from_email: '',
-  from_name: '',
-  username: '',
-  password: '',
 };
 
 function formatJson(value: unknown) {
@@ -69,21 +44,6 @@ function toForm(settings: PlatformRuntimeSettings): RuntimeSettingsForm {
     ai_gateway_tuning_text: formatJson(settings.ai_gateway_tuning),
     oauth_settings_text: formatJson(settings.oauth_settings),
     integration_settings_text: formatJson(settings.integration_settings),
-  };
-}
-
-function toSmtpForm(provider?: PlatformSmtpProviderItem | null): SmtpProviderForm {
-  if (!provider) return EMPTY_SMTP_FORM;
-  return {
-    id: provider.id,
-    name: provider.name || 'Default SMTP',
-    host: provider.config?.host || '',
-    port: String(provider.config?.port || 465),
-    secure: provider.config?.secure === undefined ? true : !!provider.config.secure,
-    from_email: provider.config?.from_email || '',
-    from_name: provider.config?.from_name || '',
-    username: '',
-    password: '',
   };
 }
 
@@ -130,10 +90,6 @@ export default function PlatformRuntimeSettingsPage() {
   const [message, setMessage] = useState<Message>(null);
   const [settings, setSettings] = useState<PlatformRuntimeSettings | null>(null);
   const [form, setForm] = useState<RuntimeSettingsForm>(EMPTY_FORM);
-  const [smtpProviders, setSmtpProviders] = useState<PlatformSmtpProviderItem[]>([]);
-  const [smtpForm, setSmtpForm] = useState<SmtpProviderForm>(EMPTY_SMTP_FORM);
-  const [smtpSaving, setSmtpSaving] = useState(false);
-  const [smtpTesting, setSmtpTesting] = useState(false);
   const [apiKeys, setApiKeys] = useState<PlatformIntegrationApiKeyItem[]>([]);
   const [apiKeyName, setApiKeyName] = useState('Feedback Admin API');
   const [apiKeySaving, setApiKeySaving] = useState(false);
@@ -146,15 +102,9 @@ export default function PlatformRuntimeSettingsPage() {
     setMessage(null);
     try {
       const next = await platformApi.getRuntimeSettings();
-      const [keys, smtp] = await Promise.all([
-        platformApi.listIntegrationApiKeys(),
-        platformApi.listSmtpProviders(),
-      ]);
+      const keys = await platformApi.listIntegrationApiKeys();
       setSettings(next);
       setForm(toForm(next));
-      const smtpItems = smtp.items || [];
-      setSmtpProviders(smtpItems);
-      setSmtpForm(toSmtpForm(smtpItems.find((item) => item.is_default) || smtpItems[0]));
       setApiKeys(keys.items || []);
     } catch (error: any) {
       setMessage({ type: 'error', text: pickApiErrorMessage(error, '加载平台设置失败') });
@@ -169,10 +119,6 @@ export default function PlatformRuntimeSettingsPage() {
 
   const updateForm = (patch: Partial<RuntimeSettingsForm>) => {
     setForm((prev) => ({ ...prev, ...patch }));
-  };
-
-  const updateSmtpForm = (patch: Partial<SmtpProviderForm>) => {
-    setSmtpForm((prev) => ({ ...prev, ...patch }));
   };
 
   const save = async (event: React.FormEvent) => {
@@ -201,58 +147,6 @@ export default function PlatformRuntimeSettingsPage() {
       setMessage({ type: 'error', text: pickApiErrorMessage(error, error?.message || '保存平台设置失败') });
     } finally {
       setSaving(false);
-    }
-  };
-
-  const saveSmtpProvider = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setSmtpSaving(true);
-    setMessage(null);
-    try {
-      const payload = {
-        name: smtpForm.name.trim() || 'Default SMTP',
-        is_active: true,
-        is_default: true,
-        config: {
-          host: smtpForm.host.trim(),
-          port: Number(smtpForm.port || 465),
-          secure: smtpForm.secure,
-          from_email: smtpForm.from_email.trim(),
-          from_name: smtpForm.from_name.trim() || undefined,
-        },
-        secrets: {
-          username: smtpForm.username.trim() || undefined,
-          password: smtpForm.password.trim() || undefined,
-        },
-      };
-      const saved = smtpForm.id
-        ? await platformApi.updateSmtpProvider(smtpForm.id, payload)
-        : await platformApi.createSmtpProvider(payload);
-      const smtp = await platformApi.listSmtpProviders();
-      setSmtpProviders(smtp.items || []);
-      setSmtpForm(toSmtpForm(saved));
-      setMessage({ type: 'success', text: 'SMTP 已保存' });
-    } catch (error: any) {
-      setMessage({ type: 'error', text: pickApiErrorMessage(error, error?.message || '保存 SMTP 失败') });
-    } finally {
-      setSmtpSaving(false);
-    }
-  };
-
-  const testSmtpProvider = async () => {
-    if (!smtpForm.id) {
-      setMessage({ type: 'error', text: '请先保存 SMTP' });
-      return;
-    }
-    setSmtpTesting(true);
-    setMessage(null);
-    try {
-      const result = await platformApi.testSmtpProvider(smtpForm.id);
-      setMessage({ type: result.ok ? 'success' : 'error', text: result.message || '测试完成' });
-    } catch (error: any) {
-      setMessage({ type: 'error', text: pickApiErrorMessage(error, '测试 SMTP 失败') });
-    } finally {
-      setSmtpTesting(false);
     }
   };
 
@@ -374,41 +268,6 @@ export default function PlatformRuntimeSettingsPage() {
         <div className="platform-form-actions">
           <button className="btn btn-primary" type="submit" disabled={saving || loading}>
             {saving ? '保存中...' : '保存'}
-          </button>
-        </div>
-      </form>
-
-      <form className="platform-card" onSubmit={saveSmtpProvider}>
-        <div className="platform-page-head">
-          <div>
-            <h1>SMTP</h1>
-            <p>{smtpProviders.length ? `已配置 ${smtpProviders.length} 个 provider` : '邮件发送'}</p>
-          </div>
-          <button className="btn btn-secondary" type="button" onClick={testSmtpProvider} disabled={smtpTesting || !smtpForm.id}>
-            {smtpTesting ? '测试中...' : '测试'}
-          </button>
-        </div>
-
-        <div className="platform-form-grid">
-          <Field label="名称" value={smtpForm.name} onChange={(value) => updateSmtpForm({ name: value })} />
-          <Field label="Host" value={smtpForm.host} placeholder="smtp.example.com" onChange={(value) => updateSmtpForm({ host: value })} />
-          <Field label="Port" value={smtpForm.port} onChange={(value) => updateSmtpForm({ port: value })} />
-          <div className="form-group">
-            <label>Secure</label>
-            <select value={smtpForm.secure ? 'true' : 'false'} onChange={(event) => updateSmtpForm({ secure: event.target.value === 'true' })}>
-              <option value="true">SSL/TLS</option>
-              <option value="false">STARTTLS</option>
-            </select>
-          </div>
-          <Field label="From Email" value={smtpForm.from_email} onChange={(value) => updateSmtpForm({ from_email: value })} />
-          <Field label="From Name" value={smtpForm.from_name} onChange={(value) => updateSmtpForm({ from_name: value })} />
-          <Field label="Username" value={smtpForm.username} onChange={(value) => updateSmtpForm({ username: value })} />
-          <Field label="Password" value={smtpForm.password} onChange={(value) => updateSmtpForm({ password: value })} />
-        </div>
-
-        <div className="platform-form-actions">
-          <button className="btn btn-primary" type="submit" disabled={smtpSaving || loading}>
-            {smtpSaving ? '保存中...' : '保存 SMTP'}
           </button>
         </div>
       </form>

@@ -582,6 +582,48 @@ export class PlatformAdminController {
     return this.emailDeliveryService.listCloudflareAccounts();
   }
 
+  @Get('email/providers/catalog')
+  @ApiOperation({ summary: '邮件供应商类型' })
+  async listEmailProviderCatalog() {
+    return this.emailDeliveryService.getProviderCatalog();
+  }
+
+  @Get('email/providers')
+  @ApiOperation({ summary: '邮件供应商列表' })
+  async listEmailProviders() {
+    return this.emailDeliveryService.listProviders();
+  }
+
+  @Post('email/providers')
+  @ApiOperation({ summary: '创建邮件供应商' })
+  async createEmailProvider(@Req() req: any, @Body() body: any) {
+    return this.emailDeliveryService.createProvider(req.user.id, body || {});
+  }
+
+  @Patch('email/providers/:provider_id')
+  @ApiOperation({ summary: '更新邮件供应商' })
+  async updateEmailProvider(@Param('provider_id') providerId: string, @Body() body: any) {
+    return this.emailDeliveryService.updateProvider(providerId, body || {});
+  }
+
+  @Delete('email/providers/:provider_id')
+  @ApiOperation({ summary: '删除邮件供应商' })
+  async deleteEmailProvider(@Param('provider_id') providerId: string) {
+    return this.emailDeliveryService.deleteProvider(providerId);
+  }
+
+  @Post('email/providers/:provider_id/test')
+  @ApiOperation({ summary: '测试邮件供应商' })
+  async testEmailProvider(@Param('provider_id') providerId: string) {
+    return this.emailDeliveryService.testProvider(providerId);
+  }
+
+  @Get('email/providers/:provider_id/sending-domains')
+  @ApiOperation({ summary: '邮件供应商发送域名列表' })
+  async listEmailProviderSendingDomains(@Param('provider_id') providerId: string) {
+    return this.emailDeliveryService.listProviderSendingDomains(providerId);
+  }
+
   @Post('email/cloudflare/accounts')
   @ApiOperation({ summary: '创建 Cloudflare 邮件账号' })
   async createEmailCloudflareAccount(@Req() req: any, @Body() body: any) {
