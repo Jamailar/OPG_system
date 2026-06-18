@@ -1,3 +1,5 @@
+![OPG System Preview](docs/assets/opg-system-preview.png)
+
 # 一人集团系统
 
 一人集团系统是一个前后端分离的 app 后端集群控制平面，目标是让一人公司能快速搭建多个 app 的认证、租户、配置、AI、视频、消息、支付、用量、审计和开发者接入能力，少重复造后端。
