@@ -172,6 +172,7 @@ Infrastructure
 - 请求链路必须持久化关键事件：route selected、upstream response/error、usage recorded、points charged。日志只做辅助排查，不能作为审计真值。
 - provider/source/model/app route 配置变更必须写审计事件，审计表只保存脱敏元数据和 before/after hash，不保存密钥明文。
 - 前端不得直接绑定第三方 AI payload。
+- AI 转发和积分结算细节见 `docs/AI_GATEWAY_BILLING_ARCHITECTURE.md`。
 
 ### 8. Video
 
@@ -197,6 +198,7 @@ Infrastructure
 
 - usage event append-only，不覆盖历史。
 - 任务结果和计费流水分离。
+- AI 和视频使用预扣、实际结算、失败退款；每条 usage 记录保存价格快照。
 - 后台报表读聚合表或物化视图，不直接扫明细表。
 
 ### 10. Runtime Settings

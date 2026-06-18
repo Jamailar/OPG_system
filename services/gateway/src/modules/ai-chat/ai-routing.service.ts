@@ -493,6 +493,8 @@ export interface AiUsageLogInput {
   estimated_cost_rmb?: number;
   points_cost?: number | null;
   points_pricing_source?: string | null;
+  pricing_snapshot_json?: Record<string, unknown> | null;
+  pricing_snapshot_hash?: string | null;
   latency_ms?: number | null;
 }
 
@@ -2683,7 +2685,7 @@ export class AiRoutingService implements OnModuleInit {
          unit_price_rmb_output_per_mtoken,
          billed_input_tokens, billed_cached_input_tokens, billed_cache_write_tokens, billed_output_tokens,
          billed_units, billed_unit_label, billed_duration_seconds, estimated_cost_rmb, points_cost, points_pricing_source,
-         usage_reference_id, latency_ms, created_at
+         pricing_snapshot_json, pricing_snapshot_hash, usage_reference_id, latency_ms, created_at
        )
        VALUES (
          gen_random_uuid(), $1::uuid, $2, $3::uuid, $4::uuid, $5, $6, $7,
@@ -2695,7 +2697,7 @@ export class AiRoutingService implements OnModuleInit {
          $30::numeric, $31::numeric, $32::numeric, $33::numeric, $34::numeric,
          $35::bigint, $36::bigint, $37::bigint, $38::bigint,
          $39::numeric, $40, $41::bigint, $42::numeric, $43::numeric,
-         $44, $45, $46::int, now()
+         $44, $45::jsonb, $46, $47, $48::int, now()
        )`,
       input.app_id,
       String(input.app_slug || '').trim().toLowerCase(),
@@ -2741,6 +2743,8 @@ export class AiRoutingService implements OnModuleInit {
       this.normalizeCostRmb(input.estimated_cost_rmb, 0),
       this.normalizeNullableDecimal(input.points_cost),
       this.normalizeNullableString(input.points_pricing_source, 64),
+      JSON.stringify(this.normalizeObject(input.pricing_snapshot_json)),
+      this.normalizeNullableString(input.pricing_snapshot_hash, 64),
       this.normalizeNullableString(input.usage_reference_id, 128),
       this.normalizeNullableInt(input.latency_ms),
     );
@@ -3431,6 +3435,8 @@ export class AiRoutingService implements OnModuleInit {
          ${this.buildUsageEffectivePointsCostSql('l')} AS points_cost,
          ${this.buildUsagePointsPricingSourceSql('l')} AS points_pricing_source,
          ${this.buildUsagePointsEstimatedSql('l')} AS points_cost_is_estimated,
+         l.pricing_snapshot_json,
+         l.pricing_snapshot_hash,
          l.usage_reference_id,
          u.display_name AS user_display_name,
          u.email AS user_email,
@@ -3512,6 +3518,8 @@ export class AiRoutingService implements OnModuleInit {
         points_cost: this.toFiniteNumber(row.points_cost, 0),
         points_pricing_source: this.normalizeNullableString(row.points_pricing_source, 64),
         points_cost_is_estimated: row.points_cost_is_estimated === true,
+        pricing_snapshot: this.normalizeObject(row.pricing_snapshot_json),
+        pricing_snapshot_hash: this.normalizeNullableString(row.pricing_snapshot_hash, 64),
         usage_reference_id: this.normalizeNullableString(row.usage_reference_id, 128),
         user_display_name: this.normalizeNullableString(row.user_display_name, 255),
         user_email: this.normalizeNullableString(row.user_email, 255),
@@ -8259,6 +8267,8 @@ export class AiRoutingService implements OnModuleInit {
         billed_unit_label varchar(32) NULL,
         billed_duration_seconds bigint NULL,
         estimated_cost_rmb numeric(18,6) NOT NULL DEFAULT 0,
+        pricing_snapshot_json jsonb NOT NULL DEFAULT '{}'::jsonb,
+        pricing_snapshot_hash varchar(64) NULL,
         latency_ms int NULL,
         created_at timestamptz NOT NULL DEFAULT now()
       )
@@ -8307,6 +8317,16 @@ export class AiRoutingService implements OnModuleInit {
     await this.prisma.$executeRawUnsafe(`
       ALTER TABLE ai_usage_logs
       ADD COLUMN IF NOT EXISTS usage_reference_id varchar(128) NULL
+    `);
+
+    await this.prisma.$executeRawUnsafe(`
+      ALTER TABLE ai_usage_logs
+      ADD COLUMN IF NOT EXISTS pricing_snapshot_json jsonb NOT NULL DEFAULT '{}'::jsonb
+    `);
+
+    await this.prisma.$executeRawUnsafe(`
+      ALTER TABLE ai_usage_logs
+      ADD COLUMN IF NOT EXISTS pricing_snapshot_hash varchar(64) NULL
     `);
 
     const usageBigintColumns = [

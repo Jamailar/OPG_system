@@ -92,6 +92,11 @@ type AiInvocationContext = {
   request_path?: string;
   skip_usage_tracking?: boolean;
   skip_points?: boolean;
+  points_reservation?: {
+    app_id: string;
+    user_id: string;
+    reservation_key: string;
+  } | null;
 };
 
 type AiUsageMetrics = {
@@ -545,17 +550,22 @@ export class AiChatService implements OnModuleInit {
     payload: Record<string, unknown>,
     context: AiInvocationContext,
   ): Promise<ForwardedAiResponse> {
-    await this.assertSufficientPointsBeforeInvoke(route, payload, context);
-    const requestRoute: ResolvedAiRoute = {
-      ...route,
-      endpoint_path: this.resolveResponsesEndpointPath(route),
-    };
-    const upstreamPayload = await this.rewriteDashscopeBase64Inputs(requestRoute, {
-      ...requestRoute.request_overrides,
-      ...payload,
-      model: requestRoute.upstream_model,
-    }, context);
-    return this.forwardToUpstream(requestRoute, upstreamPayload, context);
+    try {
+      await this.assertSufficientPointsBeforeInvoke(route, payload, context);
+      const requestRoute: ResolvedAiRoute = {
+        ...route,
+        endpoint_path: this.resolveResponsesEndpointPath(route),
+      };
+      const upstreamPayload = await this.rewriteDashscopeBase64Inputs(requestRoute, {
+        ...requestRoute.request_overrides,
+        ...payload,
+        model: requestRoute.upstream_model,
+      }, context);
+      return this.forwardToUpstream(requestRoute, upstreamPayload, context);
+    } catch (error) {
+      await this.releasePendingSyncPointsReservation(route, context, error);
+      throw error;
+    }
   }
 
   async listOpenAiModels(appSlug: string) {
@@ -1160,117 +1170,122 @@ export class AiChatService implements OnModuleInit {
     delete normalizedPayload.prefer_async_tts;
     delete normalizedPayload.async_tts;
 
-    await this.assertSufficientPointsBeforeInvoke(route, normalizedPayload, context);
+    try {
+      await this.assertSufficientPointsBeforeInvoke(route, normalizedPayload, context);
 
-    let upstreamPayload: Record<string, unknown> = {
-      ...route.request_overrides,
-      ...normalizedPayload,
-      model: route.upstream_model,
-    };
-    upstreamPayload = await this.rewriteDashscopeBase64Inputs(route, upstreamPayload, context);
-    upstreamPayload = this.sanitizeChatPayloadForReasoningModel(route, upstreamPayload);
+      let upstreamPayload: Record<string, unknown> = {
+        ...route.request_overrides,
+        ...normalizedPayload,
+        model: route.upstream_model,
+      };
+      upstreamPayload = await this.rewriteDashscopeBase64Inputs(route, upstreamPayload, context);
+      upstreamPayload = this.sanitizeChatPayloadForReasoningModel(route, upstreamPayload);
 
-    if (this.shouldUseAnthropic(route)) {
-      return this.forwardViaAnthropic(route, upstreamPayload, context);
-    }
-    if (this.isAnthropicSource(route.source.provider_type, route.source.base_url)) {
-      throw new BadRequestException(`Anthropic source 暂只支持 capability=chat，当前为 ${route.capability}`);
-    }
+      if (this.shouldUseAnthropic(route)) {
+        return this.forwardViaAnthropic(route, upstreamPayload, context);
+      }
+      if (this.isAnthropicSource(route.source.provider_type, route.source.base_url)) {
+        throw new BadRequestException(`Anthropic source 暂只支持 capability=chat，当前为 ${route.capability}`);
+      }
 
-    if (this.shouldUseGoogleGenAi(route)) {
-      return this.forwardViaGoogleGenAi(route, upstreamPayload, context);
-    }
+      if (this.shouldUseGoogleGenAi(route)) {
+        return this.forwardViaGoogleGenAi(route, upstreamPayload, context);
+      }
 
-    if (this.shouldUseOpenRouter(route)) {
-      return this.forwardViaOpenRouter(route, upstreamPayload, context);
-    }
+      if (this.shouldUseOpenRouter(route)) {
+        return this.forwardViaOpenRouter(route, upstreamPayload, context);
+      }
 
-    if (route.capability === 'chat' && this.shouldBypassAiSdkChatForward(route, upstreamPayload)) {
+      if (route.capability === 'chat' && this.shouldBypassAiSdkChatForward(route, upstreamPayload)) {
+        const multipart = this.extractMultipartInstruction(upstreamPayload);
+        if (multipart) {
+          return this.forwardMultipartToUpstream(route, upstreamPayload, multipart, context);
+        }
+        return this.forwardToUpstream(route, upstreamPayload, context);
+      }
+
+      if (route.capability === 'image' && this.shouldUseOpenAiStrictImageRoute(route, upstreamPayload, context)) {
+        return this.forwardOpenAiStrictImage(route, upstreamPayload, context);
+      }
+
+      if (route.capability === 'stt' && this.shouldUseDashscopeCompatibleStt(route)) {
+        return this.forwardDashscopeCompatibleStt(route, upstreamPayload, context);
+      }
+
+      if (route.capability === 'stt') {
+        const multipart = this.extractMultipartInstruction(upstreamPayload);
+        if (multipart) {
+          return this.forwardMultipartToUpstream(route, upstreamPayload, multipart, context);
+        }
+      }
+
+      if (this.isDashscopeCosyVoiceTtsRoute(route)) {
+        if (route.capability !== 'tts') {
+          throw new BadRequestException(`api_type ${route.api_type} 仅支持 capability=tts`);
+        }
+        return this.forwardDashscopeCosyVoiceTts(route, normalizedPayload, context);
+      }
+
+      const forceMinimaxTts =
+        route.capability === 'tts'
+        && this.isMinimaxSource(route.source.provider_type)
+        && !this.isVoiceCloneApiType(route.api_type);
+      if (this.isMinimaxTtsApiType(route.api_type) || forceMinimaxTts) {
+        if (route.capability !== 'tts') {
+          throw new BadRequestException(`api_type ${route.api_type} 仅支持 capability=tts`);
+        }
+        const asyncModeConfigured = this.normalizeApiType(route.api_type) === MINIMAX_TTS_ASYNC_API_TYPE;
+        const asyncMode = preferSyncTts ? false : (preferAsyncTts || (asyncModeConfigured && ttsTextLength > 10000));
+        return this.forwardMinimaxTts(route, normalizedPayload, asyncMode, context);
+      }
+
+      if (this.shouldUseDashscopeNative(route)) {
+        if (route.capability === 'image') {
+          return this.forwardDashscopeNativeImage(route, upstreamPayload, context);
+        }
+        if (route.capability === 'stt') {
+          return this.forwardDashscopeNativeStt(route, upstreamPayload, context);
+        }
+        if (route.capability === 'video') {
+          if (options.video_mode === 'async') {
+            return this.forwardDashscopeNativeVideoAsync(route, normalizedPayload);
+          }
+          return this.forwardDashscopeNativeVideo(route, upstreamPayload, context);
+        }
+      }
+      if (this.shouldUseAliyunIceVideoTranslation(route)) {
+        if (route.capability !== 'video') {
+          throw new BadRequestException(`api_type ${route.api_type} 仅支持 capability=video`);
+        }
+        if (options.video_mode === 'async') {
+          return this.forwardAliyunIceVideoTranslationAsync(route, normalizedPayload, context);
+        }
+        throw new BadRequestException('阿里云视频翻译仅支持异步接口');
+      }
+      if (this.shouldUseRunningHub(route)) {
+        if (route.capability === 'image') {
+          return this.forwardRunningHubImage(route, upstreamPayload, context);
+        }
+        if (route.capability === 'video') {
+          if (options.video_mode === 'async') {
+            return this.forwardRunningHubVideoAsync(route, upstreamPayload, context);
+          }
+          return this.forwardRunningHubVideo(route, upstreamPayload, context);
+        }
+        throw new BadRequestException(`RunningHub source 暂仅支持 capability=image 或 video，当前为 ${route.capability}`);
+      }
+      if (this.shouldUseAiSdkForward(route, route.capability)) {
+        return this.forwardViaAiSdk(route, upstreamPayload, context);
+      }
       const multipart = this.extractMultipartInstruction(upstreamPayload);
       if (multipart) {
         return this.forwardMultipartToUpstream(route, upstreamPayload, multipart, context);
       }
       return this.forwardToUpstream(route, upstreamPayload, context);
+    } catch (error) {
+      await this.releasePendingSyncPointsReservation(route, context, error);
+      throw error;
     }
-
-    if (route.capability === 'image' && this.shouldUseOpenAiStrictImageRoute(route, upstreamPayload, context)) {
-      return this.forwardOpenAiStrictImage(route, upstreamPayload, context);
-    }
-
-    if (route.capability === 'stt' && this.shouldUseDashscopeCompatibleStt(route)) {
-      return this.forwardDashscopeCompatibleStt(route, upstreamPayload, context);
-    }
-
-    if (route.capability === 'stt') {
-      const multipart = this.extractMultipartInstruction(upstreamPayload);
-      if (multipart) {
-        return this.forwardMultipartToUpstream(route, upstreamPayload, multipart, context);
-      }
-    }
-
-    if (this.isDashscopeCosyVoiceTtsRoute(route)) {
-      if (route.capability !== 'tts') {
-        throw new BadRequestException(`api_type ${route.api_type} 仅支持 capability=tts`);
-      }
-      return this.forwardDashscopeCosyVoiceTts(route, normalizedPayload, context);
-    }
-
-    const forceMinimaxTts =
-      route.capability === 'tts'
-      && this.isMinimaxSource(route.source.provider_type)
-      && !this.isVoiceCloneApiType(route.api_type);
-    if (this.isMinimaxTtsApiType(route.api_type) || forceMinimaxTts) {
-      if (route.capability !== 'tts') {
-        throw new BadRequestException(`api_type ${route.api_type} 仅支持 capability=tts`);
-      }
-      const asyncModeConfigured = this.normalizeApiType(route.api_type) === MINIMAX_TTS_ASYNC_API_TYPE;
-      const asyncMode = preferSyncTts ? false : (preferAsyncTts || (asyncModeConfigured && ttsTextLength > 10000));
-      return this.forwardMinimaxTts(route, normalizedPayload, asyncMode, context);
-    }
-
-    if (this.shouldUseDashscopeNative(route)) {
-      if (route.capability === 'image') {
-        return this.forwardDashscopeNativeImage(route, upstreamPayload, context);
-      }
-      if (route.capability === 'stt') {
-        return this.forwardDashscopeNativeStt(route, upstreamPayload, context);
-      }
-      if (route.capability === 'video') {
-        if (options.video_mode === 'async') {
-          return this.forwardDashscopeNativeVideoAsync(route, normalizedPayload);
-        }
-        return this.forwardDashscopeNativeVideo(route, upstreamPayload, context);
-      }
-    }
-    if (this.shouldUseAliyunIceVideoTranslation(route)) {
-      if (route.capability !== 'video') {
-        throw new BadRequestException(`api_type ${route.api_type} 仅支持 capability=video`);
-      }
-      if (options.video_mode === 'async') {
-        return this.forwardAliyunIceVideoTranslationAsync(route, normalizedPayload, context);
-      }
-      throw new BadRequestException('阿里云视频翻译仅支持异步接口');
-    }
-    if (this.shouldUseRunningHub(route)) {
-      if (route.capability === 'image') {
-        return this.forwardRunningHubImage(route, upstreamPayload, context);
-      }
-      if (route.capability === 'video') {
-        if (options.video_mode === 'async') {
-          return this.forwardRunningHubVideoAsync(route, upstreamPayload, context);
-        }
-        return this.forwardRunningHubVideo(route, upstreamPayload, context);
-      }
-      throw new BadRequestException(`RunningHub source 暂仅支持 capability=image 或 video，当前为 ${route.capability}`);
-    }
-    if (this.shouldUseAiSdkForward(route, route.capability)) {
-      return this.forwardViaAiSdk(route, upstreamPayload, context);
-    }
-    const multipart = this.extractMultipartInstruction(upstreamPayload);
-    if (multipart) {
-      return this.forwardMultipartToUpstream(route, upstreamPayload, multipart, context);
-    }
-    return this.forwardToUpstream(route, upstreamPayload, context);
   }
 
   async queryTtsAsyncTask(
@@ -14010,8 +14025,14 @@ export class AiChatService implements OnModuleInit {
     const usageReferenceId =
       this.stringOrUndefined(input.usage_reference_id)
       || this.buildAiUsageReferenceId(route, requestId);
+    const pricingSnapshot = this.buildUsagePricingSnapshot(route, billing);
+    const pointsReservation = input.billable !== false ? context.points_reservation || null : null;
+    if (pointsReservation && context.points_reservation?.reservation_key === pointsReservation.reservation_key) {
+      context.points_reservation = null;
+    }
 
     this.aiGatewayUsageQueue.enqueue('ai-usage-record-and-charge', async () => {
+      let usageRecorded = false;
       try {
         await this.aiRoutingService.recordUsage({
           app_id: route.app_id,
@@ -14062,8 +14083,11 @@ export class AiChatService implements OnModuleInit {
           estimated_cost_rmb: billing.estimated_cost_rmb,
           points_cost: null,
           points_pricing_source: null,
+          pricing_snapshot_json: pricingSnapshot.snapshot,
+          pricing_snapshot_hash: pricingSnapshot.hash,
           latency_ms: input.latency_ms ?? null,
         });
+        usageRecorded = true;
         this.aiGatewayObservability.recordRequestEventSafe({
           route,
           user_id: context.user_id || null,
@@ -14093,6 +14117,59 @@ export class AiChatService implements OnModuleInit {
           error_message: error?.message || null,
         });
         this.logger.warn(`failed to record AI usage log: ${error?.message || 'unknown error'}`);
+      }
+
+      if (pointsReservation && input.billable !== false) {
+        try {
+          const settlement = await this.settleReservedPointsForUsage(
+            route,
+            payload,
+            context,
+            pointsReservation,
+            {
+              success: input.success,
+              usage_reference_id: usageReferenceId,
+              request_id: requestId,
+              is_stream: input.is_stream,
+              billing,
+            },
+          );
+          if (usageRecorded && settlement.settled && input.success && settlement.points_cost > 0) {
+            await this.aiRoutingService.updateUsagePointsSettlement({
+              usage_reference_id: usageReferenceId,
+              points_cost: settlement.points_cost,
+              points_pricing_source: settlement.points_pricing_source,
+            });
+          }
+          this.aiGatewayObservability.recordRequestEventSafe({
+            route,
+            user_id: context.user_id || null,
+            request_id: requestId || usageReferenceId,
+            usage_reference_id: usageReferenceId,
+            request_path: context.request_path || '',
+            stage: settlement.settled ? 'points_reservation_settled' : 'points_reservation_settlement_skipped',
+            success: settlement.settled,
+            metadata: {
+              points_cost: settlement.points_cost,
+              points_pricing_source: settlement.points_pricing_source,
+              reason: settlement.reason || null,
+              billed_units: billing.billed_units,
+              billed_unit_label: billing.billed_unit_label,
+            },
+          });
+        } catch (error: any) {
+          this.aiGatewayObservability.recordRequestEventSafe({
+            route,
+            user_id: context.user_id || null,
+            request_id: requestId || usageReferenceId,
+            usage_reference_id: usageReferenceId,
+            request_path: context.request_path || '',
+            stage: 'points_reservation_settlement_failed',
+            success: false,
+            error_message: error?.message || null,
+          });
+          this.logger.warn(`failed to settle AI points reservation: ${error?.message || 'unknown error'}`);
+        }
         return;
       }
 
@@ -14175,6 +14252,9 @@ export class AiChatService implements OnModuleInit {
     if (!userId) {
       return;
     }
+    if (route.capability !== 'image' && route.capability !== 'video' && context.points_reservation?.reservation_key) {
+      return;
+    }
 
     const preflight = this.resolveBillingMetrics(
       route,
@@ -14198,6 +14278,35 @@ export class AiChatService implements OnModuleInit {
     if (wallet.balance < requiredPoints) {
       throw new ForbiddenException(`积分不足，当前剩余 ${wallet.balance.toFixed(2)}，至少需要 ${requiredPoints.toFixed(2)} 积分`);
     }
+    if (route.capability === 'image' || route.capability === 'video') {
+      return;
+    }
+
+    const reservation = await this.aiPointsService.reservePoints({
+      app_id: route.app_id,
+      user_id: userId,
+      amount: requiredPoints,
+      capability: route.capability,
+      reservation_key: this.buildSyncInvocationReservationKey(route),
+      metadata: {
+        app_slug: route.app_slug,
+        model_id: route.model_id,
+        model_key: route.model_key,
+        upstream_model: route.upstream_model,
+        capability: route.capability,
+        billing_phase: 'preflight',
+        billed_units: preflight.billed_units,
+        billed_unit_label: preflight.billed_unit_label,
+        estimated_cost_rmb: preflight.estimated_cost_rmb,
+        points_per_yuan: pointsPerYuan,
+        request_path: context.request_path || '',
+      },
+    });
+    context.points_reservation = {
+      app_id: route.app_id,
+      user_id: userId,
+      reservation_key: reservation.reservation_key,
+    };
   }
   private estimatePromptTokensForPreflight(payload: Record<string, unknown>): number {
     const focus =
@@ -14253,6 +14362,192 @@ export class AiChatService implements OnModuleInit {
     return `${route.model_id}:${Date.now().toString(36)}:${randomPart}`.slice(0, 120);
   }
 
+  private buildUsagePricingSnapshot(
+    route: ResolvedAiRoute,
+    billing: Record<string, any>,
+  ): { snapshot: Record<string, unknown>; hash: string } {
+    const snapshot = {
+      version: 1,
+      model_id: route.model_id,
+      model_key: route.model_key,
+      upstream_model: route.upstream_model,
+      capability: route.capability,
+      source_id: route.source.id,
+      provider_type: route.source.provider_type,
+      route_key: route.route_key || null,
+      pricing_mode: billing.unit_price_mode || route.pricing_mode,
+      rmb_prices: {
+        per_mtoken: route.rmb_per_mtoken,
+        per_call: route.rmb_per_call,
+        per_minute: route.rmb_per_minute,
+        input_per_mtoken: billing.effective_input_unit_price_rmb ?? route.input_rmb_per_mtoken,
+        cached_input_per_mtoken: billing.effective_cached_input_unit_price_rmb ?? route.cached_input_rmb_per_mtoken,
+        cache_write_5m_per_mtoken: billing.effective_cache_write_5m_unit_price_rmb ?? route.cache_write_5m_rmb_per_mtoken,
+        cache_write_1h_per_mtoken: billing.effective_cache_write_1h_unit_price_rmb ?? route.cache_write_1h_rmb_per_mtoken,
+        output_per_mtoken: billing.effective_output_unit_price_rmb ?? route.output_rmb_per_mtoken,
+      },
+      points_prices: {
+        per_mtoken: route.points_per_mtoken,
+        per_call: route.points_per_call,
+        per_minute: route.points_per_minute,
+        input_per_mtoken: route.points_input_per_mtoken,
+        cached_input_per_mtoken: route.points_cached_input_per_mtoken,
+        cache_write_5m_per_mtoken: route.points_cache_write_5m_per_mtoken,
+        cache_write_1h_per_mtoken: route.points_cache_write_1h_per_mtoken,
+        output_per_mtoken: route.points_output_per_mtoken,
+      },
+      billed: {
+        units: billing.billed_units,
+        unit_label: billing.billed_unit_label,
+        duration_seconds: billing.billed_duration_seconds,
+        input_tokens: billing.billed_input_tokens,
+        cached_input_tokens: billing.billed_cached_input_tokens,
+        cache_write_tokens: billing.billed_cache_write_tokens,
+        output_tokens: billing.billed_output_tokens,
+        estimated_cost_rmb: billing.estimated_cost_rmb,
+        charge_rmb: billing.charge_rmb_override ?? billing.estimated_cost_rmb,
+        points_cost_override: billing.points_cost_override ?? null,
+        points_pricing_source: billing.points_pricing_source ?? null,
+      },
+    };
+    return {
+      snapshot,
+      hash: createHash('sha256').update(JSON.stringify(snapshot)).digest('hex'),
+    };
+  }
+
+  private async settleReservedPointsForUsage(
+    route: ResolvedAiRoute,
+    _payload: Record<string, unknown>,
+    context: AiInvocationContext,
+    reservation: {
+      app_id: string;
+      user_id: string;
+      reservation_key: string;
+    },
+    input: {
+      success: boolean;
+      usage_reference_id: string;
+      request_id: string | null;
+      is_stream: boolean;
+      billing: Record<string, any>;
+    },
+  ): Promise<{
+    settled: boolean;
+    points_cost: number;
+    points_pricing_source: 'model_points_price' | 'rmb_fallback' | null;
+    reason?: string;
+  }> {
+    const settings = await this.aiPointsService.getSettingsByAppId(route.app_id);
+    const pointsPerYuan = this.normalizePointsPerYuan(settings.points_per_yuan);
+    const pointCharge = input.success
+      ? this.resolvePointsCharge(
+          route,
+          {
+            billed_units: input.billing.billed_units,
+            estimated_cost_rmb: input.billing.estimated_cost_rmb,
+            charge_rmb_override: input.billing.charge_rmb_override,
+            points_cost_override: input.billing.points_cost_override,
+            points_pricing_source_override: input.billing.points_pricing_source,
+          },
+          pointsPerYuan,
+        )
+      : { points: 0, source: null as 'model_points_price' | 'rmb_fallback' | null };
+    const externalTaskId = input.usage_reference_id.slice(0, 128);
+    await this.aiPointsService.attachReservationTask({
+      app_id: route.app_id,
+      user_id: reservation.user_id,
+      reservation_key: reservation.reservation_key,
+      external_task_id: externalTaskId,
+      usage_reference_id: input.usage_reference_id,
+      metadata: {
+        app_slug: route.app_slug,
+        model_id: route.model_id,
+        model_key: route.model_key,
+        upstream_model: route.upstream_model,
+        capability: route.capability,
+        request_path: context.request_path || '',
+        request_id: input.request_id || null,
+      },
+    });
+    const settled = await this.aiPointsService.settleReservation({
+      app_id: route.app_id,
+      user_id: reservation.user_id,
+      external_task_id: externalTaskId,
+      success: input.success,
+      settled_points: pointCharge.points,
+      usage_reference_id: input.usage_reference_id,
+      request_id: input.request_id,
+      metadata: {
+        app_slug: route.app_slug,
+        model_id: route.model_id,
+        model_key: route.model_key,
+        upstream_model: route.upstream_model,
+        capability: route.capability,
+        pricing_mode: input.billing.unit_price_mode || route.pricing_mode,
+        billed_units: input.billing.billed_units,
+        billed_unit_label: input.billing.billed_unit_label,
+        estimated_cost_rmb: input.billing.estimated_cost_rmb,
+        points_per_yuan: pointsPerYuan,
+        points_pricing_source: pointCharge.source,
+        is_stream: input.is_stream,
+        request_path: context.request_path || '',
+      },
+    });
+    if (!settled) {
+      return {
+        settled: false,
+        points_cost: pointCharge.points,
+        points_pricing_source: pointCharge.source,
+        reason: 'reservation_not_found',
+      };
+    }
+    if (input.success && settled.status !== 'captured') {
+      return {
+        settled: false,
+        points_cost: pointCharge.points,
+        points_pricing_source: pointCharge.source,
+        reason: `reservation_${settled.status}`,
+      };
+    }
+    return {
+      settled: true,
+      points_cost: pointCharge.points,
+      points_pricing_source: pointCharge.source,
+    };
+  }
+
+  private async releasePendingSyncPointsReservation(
+    route: ResolvedAiRoute,
+    context: AiInvocationContext,
+    error: unknown,
+  ) {
+    const reservation = context.points_reservation;
+    if (!reservation || reservation.app_id !== route.app_id) {
+      return;
+    }
+    context.points_reservation = null;
+    try {
+      await this.aiPointsService.releaseReservationByKey({
+        app_id: reservation.app_id,
+        user_id: reservation.user_id,
+        reservation_key: reservation.reservation_key,
+        metadata: {
+          app_slug: route.app_slug,
+          model_id: route.model_id,
+          model_key: route.model_key,
+          upstream_model: route.upstream_model,
+          capability: route.capability,
+          reason: 'pre_usage_failure',
+          request_path: context.request_path || '',
+          error_message: this.truncate(String((error as any)?.message || 'unknown error'), 500),
+        },
+      });
+    } catch (releaseError: any) {
+      this.logger.warn(`failed to release pending AI points reservation: ${releaseError?.message || 'unknown error'}`);
+    }
+  }
+
   private buildGatewayEventRequestId(route: ResolvedAiRoute, payload: Record<string, unknown>): string {
     const explicit =
       this.stringOrUndefined(payload.request_id)
@@ -14282,6 +14577,11 @@ export class AiChatService implements OnModuleInit {
   private buildSyncImageReservationKey(route: ResolvedAiRoute): string {
     const randomPart = Math.random().toString(36).slice(2, 12);
     return `image-reserve:${route.model_id}:${Date.now().toString(36)}:${randomPart}`.slice(0, 120);
+  }
+
+  private buildSyncInvocationReservationKey(route: ResolvedAiRoute): string {
+    const randomPart = Math.random().toString(36).slice(2, 12);
+    return `usage-reserve:${route.model_id}:${Date.now().toString(36)}:${randomPart}`.slice(0, 120);
   }
 
   private async reserveSyncImagePoints(

@@ -724,29 +724,32 @@ export class AiPointsService implements OnModuleInit {
       }
 
       const reservedPoints = this.toFiniteDecimal2(reservation.reserved_points, 0);
-      const capturePoints = input.success ? Math.min(reservedPoints, settledPoints) : 0;
-      const refundPoints = Math.max(0, reservedPoints - capturePoints);
-      let balanceAfter = this.toFiniteDecimal2(wallet.balance, 0);
+      const actualPoints = input.success ? settledPoints : 0;
+      const refundPoints = Math.max(0, reservedPoints - actualPoints);
+      const extraCapturePoints = Math.max(0, actualPoints - reservedPoints);
+      const balanceBefore = this.toFiniteDecimal2(wallet.balance, 0);
+
+      const updatedRows = await (tx.$queryRawUnsafe(
+        `UPDATE user_ai_points_wallets
+            SET balance = balance + $3::numeric - $4::numeric,
+                total_spent = total_spent + $5::numeric,
+                updated_at = now()
+          WHERE app_id = $1::uuid
+            AND user_id = $2::uuid
+          RETURNING id, app_id, user_id, balance, total_earned, total_spent, updated_at`,
+        appId,
+        userId,
+        refundPoints,
+        extraCapturePoints,
+        actualPoints,
+      ) as Promise<UserAiPointsWalletRow[]>);
+      const updated = updatedRows[0];
+      if (!updated) {
+        throw new BadRequestException('积分结算失败');
+      }
+      let balanceAfter = this.toFiniteDecimal2(updated.balance, balanceBefore + refundPoints - extraCapturePoints);
 
       if (refundPoints > 0) {
-        const updatedRows = await (tx.$queryRawUnsafe(
-          `UPDATE user_ai_points_wallets
-              SET balance = balance + $3::numeric,
-                  updated_at = now(),
-                  total_spent = total_spent + $4::numeric
-            WHERE app_id = $1::uuid
-              AND user_id = $2::uuid
-            RETURNING id, app_id, user_id, balance, total_earned, total_spent, updated_at`,
-          appId,
-          userId,
-          refundPoints,
-          capturePoints,
-        ) as Promise<UserAiPointsWalletRow[]>);
-        const updated = updatedRows[0];
-        if (!updated) {
-          throw new BadRequestException('积分结算失败');
-        }
-        balanceAfter = this.toFiniteDecimal2(updated.balance, balanceAfter + refundPoints);
         await (tx.$queryRawUnsafe(
           `INSERT INTO user_ai_points_ledger (
              id, app_id, user_id, delta, balance_after, event_type, reference_type, reference_id, metadata_json
@@ -770,32 +773,52 @@ export class AiPointsService implements OnModuleInit {
           reservation.reservation_key,
           JSON.stringify({
             refund_points: refundPoints,
-            captured_points: capturePoints,
+            captured_points: actualPoints,
+            actual_points: actualPoints,
             reserved_points: reservedPoints,
+            extra_capture_points: extraCapturePoints,
             success: input.success,
             ...(input.metadata || {}),
           }),
         ) as Promise<LedgerInsertRow[]>);
-      } else {
-        const updatedRows = await (tx.$queryRawUnsafe(
-          `UPDATE user_ai_points_wallets
-              SET total_spent = total_spent + $3::numeric,
-                  updated_at = now()
-            WHERE app_id = $1::uuid
-              AND user_id = $2::uuid
-            RETURNING id, app_id, user_id, balance, total_earned, total_spent, updated_at`,
-          appId,
-          userId,
-          capturePoints,
-        ) as Promise<UserAiPointsWalletRow[]>);
-        const updated = updatedRows[0];
-        if (!updated) {
-          throw new BadRequestException('积分结算失败');
-        }
-        balanceAfter = this.toFiniteDecimal2(updated.balance, balanceAfter);
       }
 
-      if (capturePoints > 0) {
+      if (extraCapturePoints > 0) {
+        await (tx.$queryRawUnsafe(
+          `INSERT INTO user_ai_points_ledger (
+             id, app_id, user_id, delta, balance_after, event_type, reference_type, reference_id, metadata_json
+           )
+           VALUES (
+             gen_random_uuid(),
+             $1::uuid,
+             $2::uuid,
+             -$3::numeric,
+             $4::numeric,
+             'ai_usage_reserve_extra_capture',
+             'ai_usage_reservation',
+             $5::text,
+             $6::jsonb
+           )
+           RETURNING id`,
+          appId,
+          userId,
+          extraCapturePoints,
+          balanceAfter,
+          reservation.reservation_key,
+          JSON.stringify({
+            extra_capture_points: extraCapturePoints,
+            actual_points: actualPoints,
+            captured_points: actualPoints,
+            reserved_points: reservedPoints,
+            success: input.success,
+            balance_before: balanceBefore,
+            balance_after: balanceAfter,
+            ...(input.metadata || {}),
+          }),
+        ) as Promise<LedgerInsertRow[]>);
+      }
+
+      if (actualPoints > 0) {
         await (tx.$queryRawUnsafe(
           `INSERT INTO user_ai_points_ledger (
              id, app_id, user_id, delta, balance_after, event_type, reference_type, reference_id, metadata_json
@@ -817,12 +840,15 @@ export class AiPointsService implements OnModuleInit {
           balanceAfter,
           usageReferenceId || reservation.usage_reference_id || reservation.reservation_key,
           JSON.stringify({
-            points_cost: capturePoints,
+            points_cost: actualPoints,
             points_pricing_source: 'reserved_points_capture',
             request_id: input.request_id || null,
             external_task_id: externalTaskId,
             reserved_points: reservedPoints,
-            captured_points: capturePoints,
+            captured_points: actualPoints,
+            actual_points: actualPoints,
+            refund_points: refundPoints,
+            extra_capture_points: extraCapturePoints,
             ...(input.metadata || {}),
           }),
         ) as Promise<LedgerInsertRow[]>);
@@ -845,12 +871,16 @@ export class AiPointsService implements OnModuleInit {
         appId,
         userId,
         input.success ? 'captured' : 'released',
-        capturePoints,
+        actualPoints,
         usageReferenceId,
         JSON.stringify({
           success: input.success,
           refund_points: refundPoints,
-          captured_points: capturePoints,
+          captured_points: actualPoints,
+          actual_points: actualPoints,
+          reserved_points: reservedPoints,
+          extra_capture_points: extraCapturePoints,
+          settlement_delta_points: actualPoints - reservedPoints,
           request_id: input.request_id || null,
           external_task_id: externalTaskId,
           ...(input.metadata || {}),
