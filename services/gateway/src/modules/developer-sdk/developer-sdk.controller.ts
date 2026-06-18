@@ -65,13 +65,13 @@ export class DeveloperSdkController {
     @Req() req: any,
     @Body() body: { callback_url?: string; callbackUrl?: string; client?: string; profile?: string; web_url?: string; webUrl?: string },
   ) {
-    return this.developerSdkLoginService.createSession(resolveAppSlug(req), body || {}, this.getRequestOptions(req));
+    return this.developerSdkLoginService.createSession(this.getRouteAppSlug(req), body || {}, this.getRequestOptions(req));
   }
 
   @Get('auth/sessions/:state')
   @ApiOperation({ summary: 'Read a browser-based SDK login session' })
   async getLoginSession(@Req() req: any, @Param('state') state: string) {
-    return this.developerSdkLoginService.getSession(resolveAppSlug(req), state);
+    return this.developerSdkLoginService.getSession(this.getRouteAppSlug(req), state);
   }
 
   @Post('auth/sessions/:state/authorize')
@@ -83,13 +83,13 @@ export class DeveloperSdkController {
     @Param('state') state: string,
     @Body() body: { scopes?: unknown; target?: string; app_slug?: string; appSlug?: string; app?: string },
   ) {
-    return this.developerSdkLoginService.authorizeSession(resolveAppSlug(req), state, req.user, body || {});
+    return this.developerSdkLoginService.authorizeSession(this.getRouteAppSlug(req), state, req.user, body || {});
   }
 
   @Post('auth/token')
   @ApiOperation({ summary: 'Exchange a browser authorization code for a local SDK API key' })
   async exchangeLoginToken(@Req() req: any, @Body() body: { state?: string; code?: string }) {
-    return this.developerSdkLoginService.exchangeToken(resolveAppSlug(req), body || {});
+    return this.developerSdkLoginService.exchangeToken(this.getRouteAppSlug(req), body || {});
   }
 
   @Get('database/manifest')
@@ -140,5 +140,10 @@ export class DeveloperSdkController {
       baseUrl,
       routePrefix: String(req.baseUrl || ''),
     };
+  }
+
+  private getRouteAppSlug(req: any): string | undefined {
+    const app = String(req?.params?.app || '').trim();
+    return app && app.toLowerCase() !== 'api' ? app : undefined;
   }
 }
