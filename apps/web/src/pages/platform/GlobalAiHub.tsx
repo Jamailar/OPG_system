@@ -106,9 +106,19 @@ interface AiModelForm {
   execution_mode: 'sync' | 'async';
   pricing_mode: 'per_mtoken' | 'per_call' | 'per_minute' | 'per_mchar';
   rmb_per_mtoken: string;
+  input_rmb_per_mtoken: string;
+  cached_input_rmb_per_mtoken: string;
+  cache_write_5m_rmb_per_mtoken: string;
+  cache_write_1h_rmb_per_mtoken: string;
+  output_rmb_per_mtoken: string;
   rmb_per_call: string;
   rmb_per_minute: string;
   points_per_mtoken: string;
+  points_input_per_mtoken: string;
+  points_cached_input_per_mtoken: string;
+  points_cache_write_5m_per_mtoken: string;
+  points_cache_write_1h_per_mtoken: string;
+  points_output_per_mtoken: string;
   points_per_call: string;
   points_per_minute: string;
   image_quality_resolution_rates: Record<ImageQualityKey, Record<ImageResolutionKey, ImageQualityResolutionRateForm>>;
@@ -125,6 +135,36 @@ interface AiModelForm {
   is_visible: boolean;
   source_routes: AiModelSourceRouteForm[];
 }
+
+type LlmTokenCostRateField =
+  | 'input_rmb_per_mtoken'
+  | 'cached_input_rmb_per_mtoken'
+  | 'cache_write_5m_rmb_per_mtoken'
+  | 'cache_write_1h_rmb_per_mtoken'
+  | 'output_rmb_per_mtoken';
+
+type LlmTokenPointRateField =
+  | 'points_input_per_mtoken'
+  | 'points_cached_input_per_mtoken'
+  | 'points_cache_write_5m_per_mtoken'
+  | 'points_cache_write_1h_per_mtoken'
+  | 'points_output_per_mtoken';
+
+const LLM_TOKEN_COST_RATE_FIELDS: Array<{ label: string; key: LlmTokenCostRateField }> = [
+  { label: '输入', key: 'input_rmb_per_mtoken' },
+  { label: '缓存读取', key: 'cached_input_rmb_per_mtoken' },
+  { label: '写入 5m', key: 'cache_write_5m_rmb_per_mtoken' },
+  { label: '写入 1h', key: 'cache_write_1h_rmb_per_mtoken' },
+  { label: '输出', key: 'output_rmb_per_mtoken' },
+];
+
+const LLM_TOKEN_POINT_RATE_FIELDS: Array<{ label: string; key: LlmTokenPointRateField }> = [
+  { label: '输入', key: 'points_input_per_mtoken' },
+  { label: '缓存读取', key: 'points_cached_input_per_mtoken' },
+  { label: '写入 5m', key: 'points_cache_write_5m_per_mtoken' },
+  { label: '写入 1h', key: 'points_cache_write_1h_per_mtoken' },
+  { label: '输出', key: 'points_output_per_mtoken' },
+];
 
 interface AiModelSourceRouteForm {
   route_key: string;
@@ -503,9 +543,19 @@ const EMPTY_AI_MODEL_FORM: AiModelForm = {
   execution_mode: 'sync',
   pricing_mode: 'per_mtoken',
   rmb_per_mtoken: '0',
+  input_rmb_per_mtoken: '0',
+  cached_input_rmb_per_mtoken: '0',
+  cache_write_5m_rmb_per_mtoken: '0',
+  cache_write_1h_rmb_per_mtoken: '0',
+  output_rmb_per_mtoken: '0',
   rmb_per_call: '0',
   rmb_per_minute: '0',
   points_per_mtoken: '0',
+  points_input_per_mtoken: '0',
+  points_cached_input_per_mtoken: '0',
+  points_cache_write_5m_per_mtoken: '0',
+  points_cache_write_1h_per_mtoken: '0',
+  points_output_per_mtoken: '0',
   points_per_call: '0',
   points_per_minute: '0',
   image_quality_resolution_rates: createEmptyImageQualityResolutionRates(),
@@ -1153,11 +1203,61 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
     [aiModelForm.capability, aiModelForm.minimax_audio_mode, selectedModelTestSource?.provider_type],
   );
 
+  const formatDetailedLlmCostRates = (item: {
+    input_rmb_per_mtoken?: number;
+    cached_input_rmb_per_mtoken?: number;
+    cache_write_5m_rmb_per_mtoken?: number;
+    cache_write_1h_rmb_per_mtoken?: number;
+    output_rmb_per_mtoken?: number;
+    rmb_per_mtoken?: number;
+    unit_price_rmb_per_mtoken?: number;
+  }) => {
+    const rates = [
+      ['输入', item.input_rmb_per_mtoken],
+      ['缓存', item.cached_input_rmb_per_mtoken],
+      ['写 5m', item.cache_write_5m_rmb_per_mtoken],
+      ['写 1h', item.cache_write_1h_rmb_per_mtoken],
+      ['输出', item.output_rmb_per_mtoken ?? item.rmb_per_mtoken ?? item.unit_price_rmb_per_mtoken],
+    ] as const;
+    const hasDetailedRate = rates.some(([, value]) => Number(value || 0) > 0);
+    if (!hasDetailedRate) {
+      return null;
+    }
+    return rates.map(([label, value]) => `${label} ¥${Number(value || 0).toFixed(4)}`).join(' · ');
+  };
+
+  const formatDetailedLlmPointRates = (item: {
+    points_input_per_mtoken?: number;
+    points_cached_input_per_mtoken?: number;
+    points_cache_write_5m_per_mtoken?: number;
+    points_cache_write_1h_per_mtoken?: number;
+    points_output_per_mtoken?: number;
+    points_per_mtoken?: number;
+  }) => {
+    const rates = [
+      ['输入', item.points_input_per_mtoken],
+      ['缓存', item.points_cached_input_per_mtoken],
+      ['写 5m', item.points_cache_write_5m_per_mtoken],
+      ['写 1h', item.points_cache_write_1h_per_mtoken],
+      ['输出', item.points_output_per_mtoken ?? item.points_per_mtoken],
+    ] as const;
+    const hasDetailedRate = rates.some(([, value]) => Number(value || 0) > 0);
+    if (!hasDetailedRate) {
+      return null;
+    }
+    return rates.map(([label, value]) => `${label} ${Number(value || 0).toFixed(4)} 积分`).join(' · ');
+  };
+
   const formatModelPrice = (item: {
     capability?: PlatformAiModelItem['capability'] | PlatformAiUsageLogItem['capability'];
     pricing_mode?: PlatformAiModelItem['pricing_mode'] | PlatformAiUsageLogItem['unit_price_mode'];
     unit_price_mode?: PlatformAiUsageLogItem['unit_price_mode'];
     rmb_per_mtoken?: number;
+    input_rmb_per_mtoken?: number;
+    cached_input_rmb_per_mtoken?: number;
+    cache_write_5m_rmb_per_mtoken?: number;
+    cache_write_1h_rmb_per_mtoken?: number;
+    output_rmb_per_mtoken?: number;
     rmb_per_call?: number;
     rmb_per_minute?: number;
     points_per_mtoken?: number;
@@ -1204,6 +1304,12 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
     if (pricingMode === 'per_call') {
       return formatPricePerCall(item.rmb_per_call ?? item.unit_price_rmb_per_call, callUnit);
     }
+    if (capability === 'chat') {
+      const detailedPrice = formatDetailedLlmCostRates(item);
+      if (detailedPrice) {
+        return detailedPrice;
+      }
+    }
     return isEmbedding
       ? `¥${Number((item.rmb_per_mtoken ?? item.unit_price_rmb_per_mtoken) || 0).toFixed(4)} / 1M token`
       : formatPricePerMToken(item.rmb_per_mtoken ?? item.unit_price_rmb_per_mtoken);
@@ -1214,6 +1320,11 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
     pricing_mode?: PlatformAiModelItem['pricing_mode'] | PlatformAiUsageLogItem['unit_price_mode'];
     unit_price_mode?: PlatformAiUsageLogItem['unit_price_mode'];
     points_per_mtoken?: number;
+    points_input_per_mtoken?: number;
+    points_cached_input_per_mtoken?: number;
+    points_cache_write_5m_per_mtoken?: number;
+    points_cache_write_1h_per_mtoken?: number;
+    points_output_per_mtoken?: number;
     points_per_call?: number;
     points_per_minute?: number;
     request_overrides?: Record<string, unknown>;
@@ -1250,6 +1361,12 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
     }
     if (pricingMode === 'per_call') {
       return formatPointsPerCall(item.points_per_call, callUnit);
+    }
+    if (capability === 'chat') {
+      const detailedPrice = formatDetailedLlmPointRates(item);
+      if (detailedPrice) {
+        return detailedPrice;
+      }
     }
     return formatPointsPerMToken(item.points_per_mtoken, isEmbedding);
   };
@@ -1776,9 +1893,19 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
             ? 'per_minute'
             : item.pricing_mode || resolvePricingModeByCapability(item.capability || 'chat'),
       rmb_per_mtoken: String(item.rmb_per_mtoken ?? 0),
+      input_rmb_per_mtoken: String(item.input_rmb_per_mtoken ?? 0),
+      cached_input_rmb_per_mtoken: String(item.cached_input_rmb_per_mtoken ?? 0),
+      cache_write_5m_rmb_per_mtoken: String(item.cache_write_5m_rmb_per_mtoken ?? 0),
+      cache_write_1h_rmb_per_mtoken: String(item.cache_write_1h_rmb_per_mtoken ?? 0),
+      output_rmb_per_mtoken: String(item.output_rmb_per_mtoken ?? item.rmb_per_mtoken ?? 0),
       rmb_per_call: String(item.rmb_per_call ?? 0),
       rmb_per_minute: String(item.rmb_per_minute ?? 0),
       points_per_mtoken: String(item.points_per_mtoken ?? 0),
+      points_input_per_mtoken: String(item.points_input_per_mtoken ?? 0),
+      points_cached_input_per_mtoken: String(item.points_cached_input_per_mtoken ?? 0),
+      points_cache_write_5m_per_mtoken: String(item.points_cache_write_5m_per_mtoken ?? 0),
+      points_cache_write_1h_per_mtoken: String(item.points_cache_write_1h_per_mtoken ?? 0),
+      points_output_per_mtoken: String(item.points_output_per_mtoken ?? item.points_per_mtoken ?? 0),
       points_per_call: String(item.points_per_call ?? 0),
       points_per_minute: String(item.points_per_minute ?? 0),
       image_quality_resolution_rates: imageQualityResolutionRateForm,
@@ -2302,6 +2429,21 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
       const sellPointsPerMToken = Number(aiModelForm.points_per_mtoken);
       const sellPointsPerCall = aiModelForm.capability === 'image' ? 0 : Number(aiModelForm.points_per_call);
       const sellPointsPerMinute = Number(aiModelForm.points_per_minute);
+      const usesDetailedLlmTokenPricing = aiModelForm.capability === 'chat' && aiModelForm.pricing_mode === 'per_mtoken';
+      const llmTokenCostRates = {
+        input_rmb_per_mtoken: Number(aiModelForm.input_rmb_per_mtoken),
+        cached_input_rmb_per_mtoken: Number(aiModelForm.cached_input_rmb_per_mtoken),
+        cache_write_5m_rmb_per_mtoken: Number(aiModelForm.cache_write_5m_rmb_per_mtoken),
+        cache_write_1h_rmb_per_mtoken: Number(aiModelForm.cache_write_1h_rmb_per_mtoken),
+        output_rmb_per_mtoken: Number(aiModelForm.output_rmb_per_mtoken),
+      };
+      const llmTokenPointRates = {
+        points_input_per_mtoken: Number(aiModelForm.points_input_per_mtoken),
+        points_cached_input_per_mtoken: Number(aiModelForm.points_cached_input_per_mtoken),
+        points_cache_write_5m_per_mtoken: Number(aiModelForm.points_cache_write_5m_per_mtoken),
+        points_cache_write_1h_per_mtoken: Number(aiModelForm.points_cache_write_1h_per_mtoken),
+        points_output_per_mtoken: Number(aiModelForm.points_output_per_mtoken),
+      };
       const imageQualityResolutionRates = IMAGE_QUALITY_OPTIONS.reduce((qualityAcc, quality) => {
         qualityAcc[quality.key] = IMAGE_RESOLUTION_OPTIONS.reduce((resolutionAcc, resolution) => {
           const rawRate = aiModelForm.image_quality_resolution_rates[quality.key]?.[resolution.key] || {
@@ -2372,6 +2514,24 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
       }
       if (!Number.isFinite(sellPointsPerMinute) || sellPointsPerMinute < 0) {
         throw new Error('模型扣费（按分钟积分）必须是大于等于 0 的数字');
+      }
+      if (usesDetailedLlmTokenPricing) {
+        [
+          ['输入成本（人民币 / 1M token）', llmTokenCostRates.input_rmb_per_mtoken],
+          ['缓存读取成本（人民币 / 1M token）', llmTokenCostRates.cached_input_rmb_per_mtoken],
+          ['写入 5m 成本（人民币 / 1M token）', llmTokenCostRates.cache_write_5m_rmb_per_mtoken],
+          ['写入 1h 成本（人民币 / 1M token）', llmTokenCostRates.cache_write_1h_rmb_per_mtoken],
+          ['输出成本（人民币 / 1M token）', llmTokenCostRates.output_rmb_per_mtoken],
+          ['输入售价（积分 / 1M token）', llmTokenPointRates.points_input_per_mtoken],
+          ['缓存读取售价（积分 / 1M token）', llmTokenPointRates.points_cached_input_per_mtoken],
+          ['写入 5m 售价（积分 / 1M token）', llmTokenPointRates.points_cache_write_5m_per_mtoken],
+          ['写入 1h 售价（积分 / 1M token）', llmTokenPointRates.points_cache_write_1h_per_mtoken],
+          ['输出售价（积分 / 1M token）', llmTokenPointRates.points_output_per_mtoken],
+        ].forEach(([label, value]) => {
+          if (!Number.isFinite(value as number) || (value as number) < 0) {
+            throw new Error(`${label}必须是大于等于 0 的数字`);
+          }
+        });
       }
       assignImageQualityResolutionRates(requestOverrides, imageQualityResolutionRates);
       assignVideoResolutionRates(requestOverrides, videoResolutionRates);
@@ -2465,16 +2625,28 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
         : isAudioProviderModel
           ? 'per_mchar'
           : aiModelForm.pricing_mode || resolvePricingModeByCapability(aiModelForm.capability);
+      const legacyRmbPerMToken = usesDetailedLlmTokenPricing ? llmTokenCostRates.output_rmb_per_mtoken : unitPricePerMToken;
+      const legacyPointsPerMToken = usesDetailedLlmTokenPricing ? llmTokenPointRates.points_output_per_mtoken : sellPointsPerMToken;
       const payload = {
         model_key: aiModelForm.model_key.trim(),
         display_name: aiModelForm.display_name.trim() || aiModelForm.model_key.trim(),
         capability: aiModelForm.capability,
         execution_mode: isAudioProviderModel ? 'sync' : aiModelForm.execution_mode,
         pricing_mode: pricingMode,
-        rmb_per_mtoken: unitPricePerMToken,
+        rmb_per_mtoken: legacyRmbPerMToken,
+        input_rmb_per_mtoken: usesDetailedLlmTokenPricing ? llmTokenCostRates.input_rmb_per_mtoken : 0,
+        cached_input_rmb_per_mtoken: usesDetailedLlmTokenPricing ? llmTokenCostRates.cached_input_rmb_per_mtoken : 0,
+        cache_write_5m_rmb_per_mtoken: usesDetailedLlmTokenPricing ? llmTokenCostRates.cache_write_5m_rmb_per_mtoken : 0,
+        cache_write_1h_rmb_per_mtoken: usesDetailedLlmTokenPricing ? llmTokenCostRates.cache_write_1h_rmb_per_mtoken : 0,
+        output_rmb_per_mtoken: usesDetailedLlmTokenPricing ? llmTokenCostRates.output_rmb_per_mtoken : legacyRmbPerMToken,
         rmb_per_call: unitPricePerCall,
         rmb_per_minute: unitPricePerMinute,
-        points_per_mtoken: sellPointsPerMToken,
+        points_per_mtoken: legacyPointsPerMToken,
+        points_input_per_mtoken: usesDetailedLlmTokenPricing ? llmTokenPointRates.points_input_per_mtoken : 0,
+        points_cached_input_per_mtoken: usesDetailedLlmTokenPricing ? llmTokenPointRates.points_cached_input_per_mtoken : 0,
+        points_cache_write_5m_per_mtoken: usesDetailedLlmTokenPricing ? llmTokenPointRates.points_cache_write_5m_per_mtoken : 0,
+        points_cache_write_1h_per_mtoken: usesDetailedLlmTokenPricing ? llmTokenPointRates.points_cache_write_1h_per_mtoken : 0,
+        points_output_per_mtoken: usesDetailedLlmTokenPricing ? llmTokenPointRates.points_output_per_mtoken : legacyPointsPerMToken,
         points_per_call: sellPointsPerCall,
         points_per_minute: sellPointsPerMinute,
         default_source_id: primarySourceId,
@@ -3503,57 +3675,97 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
                       ? '语音转录与语音生成固定按分钟计费。'
                       : aiModelForm.capability === 'embedding'
                         ? '嵌入模型按 token 计费。'
-                        : '文字模型按输出 token 计费。'}
+                        : '文字模型按输入、缓存和输出 token 计费。'}
                 </div>
               </div>
-              <div className="form-group">
-                <label>
-                  {aiModelForm.pricing_mode === 'per_call'
-                    ? aiModelForm.capability === 'video'
-                      ? '备用成本（人民币 / 次）'
-                      : aiModelForm.capability === 'tts'
-                        ? '成本单价（人民币 / 次）'
-                        : '成本单价（人民币 / 张）'
-                    : aiModelForm.pricing_mode === 'per_minute'
-                      ? '成本单价（人民币 / 分钟）'
-                      : aiModelForm.pricing_mode === 'per_mchar'
-                        ? '成本单价（人民币 / 1M 字符）'
-                      : aiModelForm.capability === 'embedding'
-                        ? '成本单价（人民币 / 1M token）'
-                        : '成本单价（人民币 / 1M 输出 token）'}
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.0001"
-                  value={
-                    aiModelForm.pricing_mode === 'per_call'
-                      ? aiModelForm.rmb_per_call
+              {aiModelForm.capability === 'chat' && aiModelForm.pricing_mode === 'per_mtoken' ? (
+                <div className="form-group span-2">
+                  <label>成本价（人民币 / 1M token）</label>
+                  <div className="ai-hub-rate-grid">
+                    {LLM_TOKEN_COST_RATE_FIELDS.map(({ label, key }) => (
+                      <div className="ai-hub-rate-field" key={key}>
+                        <span>{label}</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.0001"
+                          value={aiModelForm[key]}
+                          onChange={(event) => setAiModelForm((prev) => ({ ...prev, [key]: event.target.value }))}
+                          placeholder="0"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label>
+                    {aiModelForm.pricing_mode === 'per_call'
+                      ? aiModelForm.capability === 'video'
+                        ? '备用成本（人民币 / 次）'
+                        : aiModelForm.capability === 'tts'
+                          ? '成本单价（人民币 / 次）'
+                          : '成本单价（人民币 / 张）'
                       : aiModelForm.pricing_mode === 'per_minute'
-                        ? aiModelForm.rmb_per_minute
-                        : aiModelForm.rmb_per_mtoken
-                  }
-                  onChange={(event) =>
-                    setAiModelForm((prev) => (
-                      prev.pricing_mode === 'per_call'
-                        ? { ...prev, rmb_per_call: event.target.value }
-                        : prev.pricing_mode === 'per_minute'
-                          ? { ...prev, rmb_per_minute: event.target.value }
-                          : { ...prev, rmb_per_mtoken: event.target.value }
-                    ))
-                  }
-                  placeholder={
-                    aiModelForm.pricing_mode === 'per_call'
-                      ? '例如 0.0500'
-                      : aiModelForm.pricing_mode === 'per_minute'
-                        ? '例如 0.3000'
+                        ? '成本单价（人民币 / 分钟）'
                         : aiModelForm.pricing_mode === 'per_mchar'
-                          ? '例如 100'
-                        : '例如 2.5000'
-                  }
-                />
-              </div>
-              {aiModelForm.capability !== 'image' && (
+                          ? '成本单价（人民币 / 1M 字符）'
+                        : aiModelForm.capability === 'embedding'
+                          ? '成本单价（人民币 / 1M token）'
+                          : '成本单价（人民币 / 1M token）'}
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.0001"
+                    value={
+                      aiModelForm.pricing_mode === 'per_call'
+                        ? aiModelForm.rmb_per_call
+                        : aiModelForm.pricing_mode === 'per_minute'
+                          ? aiModelForm.rmb_per_minute
+                          : aiModelForm.rmb_per_mtoken
+                    }
+                    onChange={(event) =>
+                      setAiModelForm((prev) => (
+                        prev.pricing_mode === 'per_call'
+                          ? { ...prev, rmb_per_call: event.target.value }
+                          : prev.pricing_mode === 'per_minute'
+                            ? { ...prev, rmb_per_minute: event.target.value }
+                            : { ...prev, rmb_per_mtoken: event.target.value }
+                      ))
+                    }
+                    placeholder={
+                      aiModelForm.pricing_mode === 'per_call'
+                        ? '例如 0.0500'
+                        : aiModelForm.pricing_mode === 'per_minute'
+                          ? '例如 0.3000'
+                          : aiModelForm.pricing_mode === 'per_mchar'
+                            ? '例如 100'
+                          : '例如 2.5000'
+                    }
+                  />
+                </div>
+              )}
+              {aiModelForm.capability === 'chat' && aiModelForm.pricing_mode === 'per_mtoken' ? (
+                <div className="form-group span-2">
+                  <label>售价（积分 / 1M token）</label>
+                  <div className="ai-hub-rate-grid">
+                    {LLM_TOKEN_POINT_RATE_FIELDS.map(({ label, key }) => (
+                      <div className="ai-hub-rate-field" key={key}>
+                        <span>{label}</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.0001"
+                          value={aiModelForm[key]}
+                          onChange={(event) => setAiModelForm((prev) => ({ ...prev, [key]: event.target.value }))}
+                          placeholder="0"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : aiModelForm.capability !== 'image' && (
                 <div className="form-group">
                   <label>
                     {aiModelForm.pricing_mode === 'per_call'
@@ -3568,7 +3780,7 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
                           ? '扣费（积分 / 100 字符）'
                         : aiModelForm.capability === 'embedding'
                           ? '扣费（积分 / 1M token）'
-                          : '扣费（积分 / 1M 输出 token）'}
+                          : '扣费（积分 / 1M token）'}
                   </label>
                   <input
                     type="number"
@@ -3591,7 +3803,7 @@ export default function GlobalAiHub({ fixedTab, hideTopTabSwitcher = false, hide
                             ? { ...prev, points_per_minute: event.target.value }
                             : prev.pricing_mode === 'per_mchar'
                               ? { ...prev, points_per_call: event.target.value }
-                            : { ...prev, points_per_mtoken: event.target.value }
+                              : { ...prev, points_per_mtoken: event.target.value }
                       ))
                     }
                     placeholder={

@@ -12660,34 +12660,65 @@ export class AiChatService implements OnModuleInit {
   ) {
     const outputTokens = this.resolveBillableTokenUnits(route, payload, usage, mode);
     if (mode === 'preflight') {
-      const estimatedCostRmb = this.estimateCostRmb(
-        outputTokens,
-        route.pricing_mode,
-        route.rmb_per_mtoken,
-        route.rmb_per_call,
-        route.rmb_per_minute,
-      );
+      const estimatedInputTokens = Math.max(1, this.estimatePromptTokensForPreflight(payload));
+      const inputRmb = this.normalizeRmbPerMToken(route.input_rmb_per_mtoken, 0);
+      const cachedInputRmb = this.normalizeRmbPerMToken(route.cached_input_rmb_per_mtoken, 0);
+      const cacheWrite5mRmb = this.normalizeRmbPerMToken(route.cache_write_5m_rmb_per_mtoken, 0);
+      const cacheWrite1hRmb = this.normalizeRmbPerMToken(route.cache_write_1h_rmb_per_mtoken, 0);
+      const outputRmb = this.normalizeRmbPerMToken(route.output_rmb_per_mtoken || route.rmb_per_mtoken, 0);
+      const inputPoints = this.normalizePointsPerMToken(route.points_input_per_mtoken, 0);
+      const cachedInputPoints = this.normalizePointsPerMToken(route.points_cached_input_per_mtoken, 0);
+      const cacheWrite5mPoints = this.normalizePointsPerMToken(route.points_cache_write_5m_per_mtoken, 0);
+      const cacheWrite1hPoints = this.normalizePointsPerMToken(route.points_cache_write_1h_per_mtoken, 0);
+      const outputPoints = this.normalizePointsPerMToken(route.points_output_per_mtoken || route.points_per_mtoken, 0);
+      const detailedBillingEnabled = inputRmb > 0
+        || cachedInputRmb > 0
+        || cacheWrite5mRmb > 0
+        || cacheWrite1hRmb > 0
+        || inputPoints > 0
+        || cachedInputPoints > 0
+        || cacheWrite5mPoints > 0
+        || cacheWrite1hPoints > 0;
+      const estimatedCostRmb = detailedBillingEnabled
+        ? Number((
+          this.estimateMTokenCost(estimatedInputTokens, inputRmb)
+          + this.estimateMTokenCost(outputTokens, outputRmb)
+        ).toFixed(6))
+        : this.estimateCostRmb(
+          outputTokens,
+          route.pricing_mode,
+          route.rmb_per_mtoken,
+          route.rmb_per_call,
+          route.rmb_per_minute,
+        );
+      const directPoints = detailedBillingEnabled
+        ? this.estimateMTokenCost(estimatedInputTokens, inputPoints)
+          + this.estimateMTokenCost(outputTokens, outputPoints)
+        : this.estimateMTokenCost(outputTokens, route.points_per_mtoken);
+      const pointsCostOverride = directPoints > 0
+        ? this.normalizePointsCharge(Math.max(0.01, directPoints))
+        : null;
       return {
-        billed_units: outputTokens,
-        billed_unit_label: 'output_token' as const,
-        billed_input_tokens: null,
+        billed_units: detailedBillingEnabled ? estimatedInputTokens + outputTokens : outputTokens,
+        billed_unit_label: detailedBillingEnabled ? 'token' as const : 'output_token' as const,
+        billed_input_tokens: detailedBillingEnabled ? estimatedInputTokens : null,
         billed_cached_input_tokens: null,
         billed_cache_write_tokens: null,
         billed_output_tokens: outputTokens,
         billed_duration_seconds: null,
         estimated_cost_rmb: estimatedCostRmb,
         unit_price_mode: 'per_mtoken' as const,
-        effective_unit_price_rmb: route.rmb_per_mtoken,
-        effective_unit_price_points: route.points_per_mtoken > 0 ? route.points_per_mtoken : null,
-        effective_input_unit_price_rmb: null,
-        effective_cached_input_unit_price_rmb: null,
-        effective_cache_write_5m_unit_price_rmb: null,
-        effective_cache_write_1h_unit_price_rmb: null,
-        effective_output_unit_price_rmb: route.rmb_per_mtoken,
-        points_cost_override: route.points_per_mtoken > 0
-          ? this.normalizePointsCharge(Math.max(0.01, (outputTokens * route.points_per_mtoken) / 1_000_000))
+        effective_unit_price_rmb: detailedBillingEnabled ? outputRmb : route.rmb_per_mtoken,
+        effective_unit_price_points: (detailedBillingEnabled ? outputPoints : route.points_per_mtoken) > 0
+          ? (detailedBillingEnabled ? outputPoints : route.points_per_mtoken)
           : null,
-        points_pricing_source: route.points_per_mtoken > 0 ? 'model_points_price' as const : null,
+        effective_input_unit_price_rmb: detailedBillingEnabled ? inputRmb : null,
+        effective_cached_input_unit_price_rmb: detailedBillingEnabled ? cachedInputRmb : null,
+        effective_cache_write_5m_unit_price_rmb: detailedBillingEnabled ? cacheWrite5mRmb : null,
+        effective_cache_write_1h_unit_price_rmb: detailedBillingEnabled ? cacheWrite1hRmb : null,
+        effective_output_unit_price_rmb: detailedBillingEnabled ? outputRmb : route.rmb_per_mtoken,
+        points_cost_override: pointsCostOverride,
+        points_pricing_source: pointsCostOverride !== null ? 'model_points_price' as const : null,
       };
     }
 
