@@ -1693,7 +1693,7 @@ export class PlatformAdminService implements OnModuleInit {
     await this.assertSlugNotUsedByAlias(slug);
     const inserted = await (this.prisma.$queryRawUnsafe(
       `INSERT INTO apps (id, slug, name, status, created_at, updated_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, now(), now())
+       VALUES (gen_random_uuid(), $1, $2, $3::"AppStatus", now(), now())
        RETURNING id`,
       slug,
       name,
@@ -1779,7 +1779,7 @@ export class PlatformAdminService implements OnModuleInit {
         await this.prisma.$executeRawUnsafe(
           `UPDATE apps
            SET name = $2,
-               status = $3,
+               status = $3::"AppStatus",
                updated_at = now()
            WHERE id = $1::uuid`,
           appId,
@@ -1798,7 +1798,7 @@ export class PlatformAdminService implements OnModuleInit {
       } else if (nextStatus !== undefined) {
         await this.prisma.$executeRawUnsafe(
           `UPDATE apps
-           SET status = $2,
+           SET status = $2::"AppStatus",
                updated_at = now()
            WHERE id = $1::uuid`,
           appId,
