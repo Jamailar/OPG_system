@@ -1,3 +1,5 @@
+import { io, type Socket } from 'socket.io-client';
+
 export type OpgApiKeyProvider = string | (() => string | Promise<string>);
 
 export type OpgClientOptions = {
@@ -76,6 +78,29 @@ export type OpgSchemaColumnInput = Record<string, unknown> & {
   dataType?: string;
   dry_run?: boolean;
   dryRun?: boolean;
+};
+
+export type OpgRealtimeEnvelope = {
+  id: string;
+  channel: string;
+  event: string;
+  app_id?: string | null;
+  app_slug?: string | null;
+  resource_id?: string | null;
+  payload: Record<string, unknown>;
+  created_at: string;
+};
+
+export type OpgRealtimeSubscription = {
+  channel: string;
+  socket: Socket;
+  close(): void;
+};
+
+export type OpgRealtimeSubscribeOptions = {
+  event?: string;
+  timeoutMs?: number;
+  transports?: Array<'websocket' | 'polling'>;
 };
 
 type OpgClientInternals = {
@@ -300,6 +325,13 @@ export type OpgClient = OpgClientInternals & {
       delete(id: string): Promise<Record<string, unknown>>;
     };
   };
+  realtime: {
+    subscribe(
+      channel: string,
+      handler: (event: OpgRealtimeEnvelope) => void,
+      options?: OpgRealtimeSubscribeOptions,
+    ): Promise<OpgRealtimeSubscription>;
+  };
 };
 
 export function createOpgClient(options: OpgClientOptions): OpgClient {
@@ -368,6 +400,41 @@ export function createOpgClient(options: OpgClientOptions): OpgClient {
     };
   };
 
+  const subscribeRealtime = async (
+    channel: string,
+    handler: (event: OpgRealtimeEnvelope) => void,
+    subscribeOptions: OpgRealtimeSubscribeOptions = {},
+  ): Promise<OpgRealtimeSubscription> => {
+    if (!app) {
+      throw new Error('OPG app is required for realtime subscriptions.');
+    }
+    const token = await resolveApiKey(options.apiKey);
+    if (!token) {
+      throw new Error('OPG apiKey is required for realtime subscriptions.');
+    }
+    const socket = io(`${baseUrl}/realtime`, {
+      path: '/socket.io',
+      auth: { token, app: options.app },
+      transports: subscribeOptions.transports || ['websocket', 'polling'],
+    });
+    const eventName = subscribeOptions.event || 'opg.event';
+    socket.on(eventName, handler);
+    await waitForSocketConnect(socket, subscribeOptions.timeoutMs || 10000);
+    const ack = await socket.timeout(subscribeOptions.timeoutMs || 10000).emitWithAck('subscribe', { channel });
+    if (!ack?.ok) {
+      socket.close();
+      throw new Error(ack?.message || ack?.code || `Failed to subscribe to ${channel}`);
+    }
+    return {
+      channel,
+      socket,
+      close: () => {
+        socket.emit('unsubscribe', { channel });
+        socket.close();
+      },
+    };
+  };
+
   return {
     platform,
     request,
@@ -418,6 +485,9 @@ export function createOpgClient(options: OpgClientOptions): OpgClient {
     data: {
       schema: () => request<Record<string, unknown>>('/data/schema'),
       table: dataTable,
+    },
+    realtime: {
+      subscribe: subscribeRealtime,
     },
   };
 }
@@ -830,6 +900,33 @@ async function resolveApiKey(apiKey: OpgApiKeyProvider | undefined) {
     return String(await apiKey()).trim();
   }
   return String(apiKey).trim();
+}
+
+function waitForSocketConnect(socket: Socket, timeoutMs: number) {
+  if (socket.connected) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Timed out connecting to OPG realtime gateway'));
+    }, timeoutMs);
+    const cleanup = () => {
+      clearTimeout(timeout);
+      socket.off('connect', onConnect);
+      socket.off('connect_error', onError);
+      socket.off('error', onError);
+    };
+    const onConnect = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = (error: unknown) => {
+      cleanup();
+      reject(error instanceof Error ? error : new Error(String((error as any)?.message || error || 'Realtime connection failed')));
+    };
+    socket.once('connect', onConnect);
+    socket.once('connect_error', onError);
+    socket.once('error', onError);
+  });
 }
 
 function normalizeBaseUrl(value: string) {

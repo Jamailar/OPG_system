@@ -15,6 +15,7 @@ import {
   UpsertAppDataPolicyInput,
 } from './app-schema.types';
 import { PolicyEngineService } from './policy-engine.service';
+import { RealtimeEventsService } from '../realtime/realtime-events.service';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const IDENTIFIER_RE = /^[a-z][a-z0-9_]{1,78}$/;
@@ -41,6 +42,7 @@ export class AppSchemaService {
     @Inject(PRISMA_CLIENT) private readonly prisma: PrismaClient,
     private readonly developerAuthorizationService: DeveloperAuthorizationService,
     private readonly policyEngineService: PolicyEngineService,
+    private readonly realtimeEventsService: RealtimeEventsService,
   ) {}
 
   async getManifest(appRef: string) {
@@ -567,6 +569,14 @@ export class AppSchemaService {
       ...values,
     ) as Promise<Record<string, unknown>[]>);
     await this.recordDataEvent(app.id, actor, table.id, 'data.row.created', rows[0]?.[table.primary_key]);
+    void this.realtimeEventsService.publishDataEvent({
+      appId: app.id,
+      appSlug: app.slug,
+      table: table.slug,
+      event: 'row.created',
+      rowId: rows[0]?.[table.primary_key],
+      changedFields: insertColumns,
+    });
     return {
       ok: true,
       app: this.serializeApp(app),
@@ -610,6 +620,14 @@ export class AppSchemaService {
       throw new NotFoundException('Data row not found');
     }
     await this.recordDataEvent(app.id, actor, table.id, 'data.row.updated', row[table.primary_key]);
+    void this.realtimeEventsService.publishDataEvent({
+      appId: app.id,
+      appSlug: app.slug,
+      table: table.slug,
+      event: 'row.updated',
+      rowId: row[table.primary_key],
+      changedFields: setColumns,
+    });
     return {
       ok: true,
       app: this.serializeApp(app),
@@ -648,6 +666,14 @@ export class AppSchemaService {
       throw new NotFoundException('Data row not found');
     }
     await this.recordDataEvent(app.id, actor, table.id, 'data.row.deleted', row[table.primary_key]);
+    void this.realtimeEventsService.publishDataEvent({
+      appId: app.id,
+      appSlug: app.slug,
+      table: table.slug,
+      event: 'row.deleted',
+      rowId: row[table.primary_key],
+      changedFields: [],
+    });
     return {
       ok: true,
       app: this.serializeApp(app),

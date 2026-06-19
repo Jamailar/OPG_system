@@ -5,6 +5,7 @@ import { PlatformAdminAccessGuard } from '../../common/guards/platform-admin-acc
 import { AppApiKeysModule } from '../api-keys/app-api-keys.module';
 import { AuthModule } from '../auth/auth.module';
 import { DeveloperAuthorizationModule } from '../developer-sdk/developer-authorization.module';
+import { RealtimeModule } from '../realtime/realtime.module';
 import { DeveloperSdkAuthGuard } from '../developer-sdk/developer-sdk-auth.guard';
 import { AppDataController } from './app-data.controller';
 import { AppSchemaPlatformController } from './app-schema-platform.controller';
@@ -12,7 +13,7 @@ import { AppSchemaService } from './app-schema.service';
 import { PolicyEngineService } from './policy-engine.service';
 
 @Module({
-  imports: [AuthModule, AppApiKeysModule, DeveloperAuthorizationModule],
+  imports: [AuthModule, AppApiKeysModule, DeveloperAuthorizationModule, RealtimeModule],
   controllers: [AppSchemaPlatformController, AppDataController],
   providers: [AppSchemaService, PolicyEngineService, JwtAuthGuard, AdminRoleGuard, PlatformAdminAccessGuard, DeveloperSdkAuthGuard],
   exports: [AppSchemaService, PolicyEngineService],
