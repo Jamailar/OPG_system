@@ -190,6 +190,21 @@ export class AppFunctionsService implements OnModuleInit, OnApplicationShutdown 
     return { app, function: this.serializeFunction(fn), items: rows.map((row) => this.serializeRun(row)) };
   }
 
+  async deleteFunction(appRef: string, functionRef: string, actor: any, body: Record<string, unknown> = {}) {
+    const app = await this.appSchemaService.resolveApp(appRef);
+    const fn = await this.resolveFunction(app.id, functionRef);
+    const confirm = String(body.confirm || '').trim();
+    if (confirm !== `delete:${fn.slug}`) {
+      throw new BadRequestException(`confirm must be delete:${fn.slug}`);
+    }
+    await this.prisma.$executeRawUnsafe(
+      `UPDATE app_functions SET status = 'DELETED', updated_by_user_id = $1::uuid, updated_at = now() WHERE id = $2::uuid`,
+      this.actorUserId(actor),
+      fn.id,
+    );
+    return { ok: true, deleted: true, app, function: this.serializeFunction({ ...fn, status: 'DELETED' }) };
+  }
+
   async runQueued(runId: string) {
     const run = await this.resolveRun(runId);
     const fn = await this.resolveFunction(run.app_id, run.function_id);

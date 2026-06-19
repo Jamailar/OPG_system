@@ -217,12 +217,14 @@ export type OpgPlatformClient = {
       deploy(appId: string, functionId: string): Promise<Record<string, unknown>>;
       runs(appId: string, functionId: string): Promise<Record<string, unknown>>;
       invoke(appId: string, functionId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      delete(appId: string, functionId: string, input?: Record<string, unknown>): Promise<Record<string, unknown>>;
     };
     workflows: {
       list(appId: string): Promise<Record<string, unknown>>;
       create(appId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
       run(appId: string, workflowId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
       runs(appId: string, workflowId: string): Promise<Record<string, unknown>>;
+      delete(appId: string, workflowId: string, input?: Record<string, unknown>): Promise<Record<string, unknown>>;
     };
     blocks: {
       upsertAi(appId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
@@ -698,12 +700,14 @@ export function createOpgPlatformClient(options: OpgClientOptions): OpgPlatformC
         deploy: (appId, functionId) => request(appPath(appId, `/functions/${encodeURIComponent(functionId)}/deploy`), { method: 'POST', body: {} }),
         runs: (appId, functionId) => request(appPath(appId, `/functions/${encodeURIComponent(functionId)}/runs`)),
         invoke: (appId, functionId, input) => request(appPath(appId, `/functions/${encodeURIComponent(functionId)}/invoke`), { method: 'POST', body: input }),
+        delete: (appId, functionId, input = {}) => request(appPath(appId, `/functions/${encodeURIComponent(functionId)}`), { method: 'DELETE', body: input }),
       },
       workflows: {
         list: (appId) => request(appPath(appId, '/workflows')),
         create: (appId, input) => request(appPath(appId, '/workflows'), { method: 'POST', body: input }),
         run: (appId, workflowId, input) => request(appPath(appId, `/workflows/${encodeURIComponent(workflowId)}/run`), { method: 'POST', body: input }),
         runs: (appId, workflowId) => request(appPath(appId, `/workflows/${encodeURIComponent(workflowId)}/runs`)),
+        delete: (appId, workflowId, input = {}) => request(appPath(appId, `/workflows/${encodeURIComponent(workflowId)}`), { method: 'DELETE', body: input }),
       },
       blocks: {
         upsertAi: (appId, input) => request(appPath(appId, '/blocks/ai'), { method: 'POST', body: input }),

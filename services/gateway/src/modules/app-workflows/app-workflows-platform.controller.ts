@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AdminRoleGuard } from '../../common/guards/admin-role.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -35,6 +35,12 @@ export class AppWorkflowsPlatformController {
   @ApiOperation({ summary: 'List app workflow runs' })
   listRuns(@Param('app_id') appId: string, @Param('workflow_id') workflowId: string) {
     return this.appWorkflowsService.listRuns(appId, workflowId);
+  }
+
+  @Delete('apps/:app_id/workflows/:workflow_id')
+  @ApiOperation({ summary: 'Delete an app workflow' })
+  deleteWorkflow(@Req() req: any, @Param('app_id') appId: string, @Param('workflow_id') workflowId: string, @Body() body: Record<string, unknown>) {
+    return this.appWorkflowsService.deleteWorkflow(appId, workflowId, req.user, body || {});
   }
 
   @Get('workflows/runtime/status')

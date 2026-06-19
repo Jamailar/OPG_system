@@ -149,6 +149,21 @@ export class AppWorkflowsService implements OnModuleInit, OnApplicationShutdown 
     return { app, workflow: this.serializeWorkflow(workflow), items: rows.map((row) => this.serializeRun(row)) };
   }
 
+  async deleteWorkflow(appRef: string, workflowRef: string, actor: any, body: Record<string, unknown> = {}) {
+    const app = await this.appSchemaService.resolveApp(appRef);
+    const workflow = await this.resolveWorkflow(app.id, workflowRef);
+    const confirm = String(body.confirm || '').trim();
+    if (confirm !== `delete:${workflow.slug}`) {
+      throw new BadRequestException(`confirm must be delete:${workflow.slug}`);
+    }
+    await this.prisma.$executeRawUnsafe(
+      `UPDATE app_workflows SET status = 'DELETED', updated_by_user_id = $1::uuid, updated_at = now() WHERE id = $2::uuid`,
+      this.actorUserId(actor),
+      workflow.id,
+    );
+    return { ok: true, deleted: true, app, workflow: this.serializeWorkflow({ ...workflow, status: 'DELETED' }) };
+  }
+
   async runQueued(runId: string, actor: any = { authMode: 'workflow' }) {
     const run = await this.resolveRun(runId);
     const app = await this.appSchemaService.resolveApp(run.app_id);

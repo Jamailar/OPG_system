@@ -52,6 +52,8 @@ try {
   evidence.workflow_run = await client.workflows.run(workflow, { input: { email: `verify-${suffix}@example.com` } });
   evidence.build_summary = await platform.apps.build.summary(app);
   evidence.build_events = await platform.apps.build.events(app, { limit: 10 });
+  evidence.cleanup_workflow = await platform.apps.workflows.delete(app, workflow, { confirm: `delete:${workflow}` });
+  evidence.cleanup_function = await platform.apps.functions.delete(app, fn, { confirm: `delete:${fn}` });
   evidence.cleanup_table = await platform.apps.schema.dropTable(app, table, {
     dry_run: false,
     confirm: `drop:${table}`,
@@ -62,7 +64,12 @@ try {
     app,
     resources: { table, function: fn, workflow },
     checks: Object.fromEntries(Object.entries(evidence).map(([key, value]) => [key, Boolean(value)])),
-    cleanup: { structured_drop_table_supported: true, table_dropped: evidence.cleanup_table?.applied === true },
+    cleanup: {
+      structured_drop_table_supported: true,
+      table_dropped: evidence.cleanup_table?.applied === true,
+      function_deleted: evidence.cleanup_function?.deleted === true,
+      workflow_deleted: evidence.cleanup_workflow?.deleted === true,
+    },
     execution_ms: Date.now() - startedAt,
   }, null, 2));
 } catch (error) {

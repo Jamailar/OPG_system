@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AdminRoleGuard } from '../../common/guards/admin-role.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -35,6 +35,12 @@ export class AppFunctionsPlatformController {
   @ApiOperation({ summary: 'List app function runs' })
   listRuns(@Param('app_id') appId: string, @Param('function_id') functionId: string) {
     return this.appFunctionsService.listRuns(appId, functionId);
+  }
+
+  @Delete('apps/:app_id/functions/:function_id')
+  @ApiOperation({ summary: 'Delete an app function' })
+  deleteFunction(@Req() req: any, @Param('app_id') appId: string, @Param('function_id') functionId: string, @Body() body: Record<string, unknown>) {
+    return this.appFunctionsService.deleteFunction(appId, functionId, req.user, body || {});
   }
 
   @Post('apps/:app_id/functions/:function_id/invoke')
