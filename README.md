@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img alt="Node.js >=22" src="https://img.shields.io/badge/Node.js-%3E%3D22-339933?logo=node.js&logoColor=white">
+  <img alt="Node.js 22+" src="https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white">
   <img alt="React" src="https://img.shields.io/badge/Web-React%20%2B%20Vite-61DAFB?logo=react&logoColor=111111">
   <img alt="NestJS" src="https://img.shields.io/badge/API-NestJS-E0234E?logo=nestjs&logoColor=white">
   <img alt="PostgreSQL" src="https://img.shields.io/badge/Truth-PostgreSQL-4169E1?logo=postgresql&logoColor=white">
