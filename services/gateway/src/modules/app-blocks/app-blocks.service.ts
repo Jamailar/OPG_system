@@ -161,7 +161,7 @@ export class AppBlocksService {
       JSON.stringify(this.jsonObject(input.metadata)),
       this.actorUserId(actor),
     ) as Promise<any[]>);
-    return { ok: true, app, file: rows[0] };
+    return { ok: true, app, file: this.serializeStorageFile(rows[0]) };
   }
 
   private async resolveAiBlock(appId: string, blockRef: string) {
@@ -209,5 +209,14 @@ export class AppBlocksService {
 
   private jsonObject(value: unknown): Record<string, any> {
     return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
+  }
+
+  private serializeStorageFile(row: any) {
+    if (!row || typeof row !== 'object') return row;
+    const size = row.size_bytes;
+    return {
+      ...row,
+      size_bytes: typeof size === 'bigint' ? Number(size) : size,
+    };
   }
 }
