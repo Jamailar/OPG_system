@@ -210,6 +210,13 @@ export type OpgPlatformClient = {
       createTable(appId: string, input: OpgSchemaTableInput): Promise<Record<string, unknown>>;
       addColumn(appId: string, table: string, input: OpgSchemaColumnInput): Promise<Record<string, unknown>>;
     };
+    functions: {
+      list(appId: string): Promise<Record<string, unknown>>;
+      create(appId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      deploy(appId: string, functionId: string): Promise<Record<string, unknown>>;
+      runs(appId: string, functionId: string): Promise<Record<string, unknown>>;
+      invoke(appId: string, functionId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+    };
   };
   runtimeSettings: {
     get(): Promise<Record<string, unknown>>;
@@ -324,6 +331,9 @@ export type OpgClient = OpgClientInternals & {
       update(id: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
       delete(id: string): Promise<Record<string, unknown>>;
     };
+  };
+  functions: {
+    invoke(slug: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
   };
   realtime: {
     subscribe(
@@ -485,6 +495,9 @@ export function createOpgClient(options: OpgClientOptions): OpgClient {
     data: {
       schema: () => request<Record<string, unknown>>('/data/schema'),
       table: dataTable,
+    },
+    functions: {
+      invoke: (slug, input) => request<Record<string, unknown>>(`/functions/${encodeURIComponent(slug)}/invoke`, { method: 'POST', body: input }),
     },
     realtime: {
       subscribe: subscribeRealtime,
@@ -652,6 +665,13 @@ export function createOpgPlatformClient(options: OpgClientOptions): OpgPlatformC
         createTable: (appId, input) => request(appPath(appId, '/schema/tables'), { method: 'POST', body: input }),
         addColumn: (appId, table, input) =>
           request(appPath(appId, `/schema/tables/${encodeURIComponent(table)}/columns`), { method: 'POST', body: input }),
+      },
+      functions: {
+        list: (appId) => request(appPath(appId, '/functions')),
+        create: (appId, input) => request(appPath(appId, '/functions'), { method: 'POST', body: input }),
+        deploy: (appId, functionId) => request(appPath(appId, `/functions/${encodeURIComponent(functionId)}/deploy`), { method: 'POST', body: {} }),
+        runs: (appId, functionId) => request(appPath(appId, `/functions/${encodeURIComponent(functionId)}/runs`)),
+        invoke: (appId, functionId, input) => request(appPath(appId, `/functions/${encodeURIComponent(functionId)}/invoke`), { method: 'POST', body: input }),
       },
     },
     runtimeSettings: {

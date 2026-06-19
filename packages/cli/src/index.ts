@@ -78,6 +78,10 @@ async function main() {
     await runDataCommand(args.slice(1));
     return;
   }
+  if (command === 'function' || command === 'functions') {
+    await runFunctionCommand(args.slice(1));
+    return;
+  }
   if (command === 'app' || command === 'apps') {
     await runAppCommand(args.slice(1));
     return;
@@ -425,6 +429,57 @@ async function runDataCommand(commandArgs: string[]) {
   throw new Error(`Unknown data command: ${action}`);
 }
 
+async function runFunctionCommand(commandArgs: string[]) {
+  const action = commandArgs[0] || 'list';
+  const flags = parseFlags(commandArgs.slice(1));
+  const positionals = positionalArgs(commandArgs.slice(1));
+
+  if (action === 'invoke' || action === 'run') {
+    const slug = flags.function || flags.slug || positionals[0] || '';
+    if (!slug) throw new Error('Missing function slug. Use: opg function invoke <slug> --json {...}');
+    const client = await getClientFromLocalConfigWithFlagOverrides(flags);
+    printJson(await client.functions.invoke(slug, parseJsonPayload(flags)));
+    return;
+  }
+
+  const local = await readOptionalLocalConfig();
+  const appId = flags.appId || flags['app-id'] || flags.app || local.app || '';
+  if (!appId) {
+    throw new Error('Missing app id or slug. Use --app-id <id-or-slug> or run opg app use <slug>.');
+  }
+  const client = await getPlatformClientFromLocalConfigWithFlagOverrides(flags);
+
+  if (action === 'list' || action === 'ls') {
+    printJson(await client.apps.functions.list(appId));
+    return;
+  }
+  if (action === 'create') {
+    const payload = flags.json || flags.body
+      ? parseJsonPayload(flags)
+      : {
+          slug: flags.slug || flags.name || positionals[0] || '',
+          source: flags.source ? JSON.parse(flags.source) : { kind: 'echo' },
+          trigger: flags.trigger ? JSON.parse(flags.trigger) : {},
+        };
+    printJson(await client.apps.functions.create(appId, payload));
+    return;
+  }
+  if (action === 'deploy') {
+    const functionId = flags.functionId || flags['function-id'] || flags.function || flags.slug || positionals[0] || '';
+    if (!functionId) throw new Error('Missing function id or slug. Use: opg function deploy <slug>');
+    printJson(await client.apps.functions.deploy(appId, functionId));
+    return;
+  }
+  if (action === 'runs') {
+    const functionId = flags.functionId || flags['function-id'] || flags.function || flags.slug || positionals[0] || '';
+    if (!functionId) throw new Error('Missing function id or slug. Use: opg function runs <slug>');
+    printJson(await client.apps.functions.runs(appId, functionId));
+    return;
+  }
+
+  throw new Error(`Unknown function command: ${action}`);
+}
+
 async function runAppCommand(commandArgs: string[]) {
   const action = commandArgs[0] || 'list';
   const flags = parseFlags(commandArgs.slice(1));
@@ -726,6 +781,48 @@ async function startMcpServer() {
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
     async ({ appId, table, payload }: any) => toToolResult(await platformClient.apps.schema.addColumn(appId, table, payload)),
+  );
+
+  registerTool(
+    'opg_function_create',
+    {
+      title: 'Create OPG App Function',
+      description: 'Create an app function draft with a structured handler contract.',
+      inputSchema: {
+        appId: z.string().min(1).describe('Tenant app id or slug.'),
+        payload: z.record(z.unknown()).describe('Function payload: slug, source, trigger.'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ appId, payload }: any) => toToolResult(await platformClient.apps.functions.create(appId, payload)),
+  );
+
+  registerTool(
+    'opg_function_deploy',
+    {
+      title: 'Deploy OPG App Function',
+      description: 'Deploy the current source as a new app function version.',
+      inputSchema: {
+        appId: z.string().min(1).describe('Tenant app id or slug.'),
+        functionId: z.string().min(1).describe('Function id or slug.'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ appId, functionId }: any) => toToolResult(await platformClient.apps.functions.deploy(appId, functionId)),
+  );
+
+  registerTool(
+    'opg_function_invoke',
+    {
+      title: 'Invoke OPG App Function',
+      description: 'Invoke a deployed app function through the app-scoped API.',
+      inputSchema: {
+        slug: z.string().min(1).describe('Function slug.'),
+        payload: z.record(z.unknown()).describe('Invoke payload, usually { input }.'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ slug, payload }: any) => toToolResult(await client.functions.invoke(slug, payload)),
   );
 
   registerTool(
@@ -1825,7 +1922,7 @@ function parseScopesFlag(flags: Record<string, string>) {
   return raw.split(',').map((item) => item.trim()).filter(Boolean);
 }
 
-type HelpTopic = 'root' | 'init' | 'login' | 'app' | 'db' | 'schema' | 'data' | 'platform' | 'codex' | 'mcp';
+type HelpTopic = 'root' | 'init' | 'login' | 'app' | 'db' | 'schema' | 'data' | 'function' | 'platform' | 'codex' | 'mcp';
 
 function isHelpRequest(commandArgs: string[]) {
   return commandArgs.length === 0 || commandArgs.some(isHelpToken);
@@ -1839,7 +1936,8 @@ function resolveHelpTopic(commandArgs: string[]): HelpTopic {
   const firstTopic = commandArgs.find((item) => !isHelpToken(item) && !item.startsWith('-')) || '';
   if (firstTopic === 'database') return 'db';
   if (firstTopic === 'apps') return 'app';
-  if (['init', 'login', 'app', 'db', 'schema', 'data', 'platform', 'codex', 'mcp'].includes(firstTopic)) {
+  if (firstTopic === 'functions') return 'function';
+  if (['init', 'login', 'app', 'db', 'schema', 'data', 'function', 'platform', 'codex', 'mcp'].includes(firstTopic)) {
     return firstTopic as HelpTopic;
   }
   return 'root';
@@ -1999,6 +2097,22 @@ Examples:
     return;
   }
 
+  if (topic === 'function') {
+    console.log(`OPG CLI - function
+
+Usage:
+  opg function list --app-id <app>
+  opg function create --app-id <app> --slug sync_customer --source '{"kind":"echo"}'
+  opg function deploy --app-id <app> sync_customer
+  opg function invoke sync_customer --json '{"input":{"id":"123"}}'
+  opg function runs --app-id <app> sync_customer
+
+Notes:
+  Function source uses OPG structured handlers, not arbitrary shell execution.
+`);
+    return;
+  }
+
   if (topic === 'platform') {
     console.log(`OPG CLI - platform
 
@@ -2092,6 +2206,7 @@ Core commands:
   db            Inspect or query app-owned database tables.
   schema        Create structured app data tables and columns.
   data          Read and write registered app data rows.
+  function      Create, deploy, invoke, and inspect app functions.
   platform      Call platform control-plane APIs.
   codex         Write Codex MCP config.
   mcp           Start MCP server over stdio.
@@ -2104,6 +2219,7 @@ Common flow:
   opg db smoke
   opg schema table create --name customers --columns email:text --apply
   opg data list customers
+  opg function invoke sync_customer --json '{"input":{"id":"123"}}'
   opg codex install
 
 Help:
@@ -2113,6 +2229,7 @@ Help:
   opg db --help
   opg schema --help
   opg data --help
+  opg function --help
   opg platform --help
 `);
 }
