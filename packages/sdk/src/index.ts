@@ -223,6 +223,13 @@ export type OpgPlatformClient = {
       run(appId: string, workflowId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
       runs(appId: string, workflowId: string): Promise<Record<string, unknown>>;
     };
+    blocks: {
+      upsertAi(appId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      upsertVideo(appId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      runAi(appId: string, block: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      runVideo(appId: string, block: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+      saveStorage(appId: string, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+    };
   };
   runtimeSettings: {
     get(): Promise<Record<string, unknown>>;
@@ -690,6 +697,13 @@ export function createOpgPlatformClient(options: OpgClientOptions): OpgPlatformC
         create: (appId, input) => request(appPath(appId, '/workflows'), { method: 'POST', body: input }),
         run: (appId, workflowId, input) => request(appPath(appId, `/workflows/${encodeURIComponent(workflowId)}/run`), { method: 'POST', body: input }),
         runs: (appId, workflowId) => request(appPath(appId, `/workflows/${encodeURIComponent(workflowId)}/runs`)),
+      },
+      blocks: {
+        upsertAi: (appId, input) => request(appPath(appId, '/blocks/ai'), { method: 'POST', body: input }),
+        upsertVideo: (appId, input) => request(appPath(appId, '/blocks/video'), { method: 'POST', body: input }),
+        runAi: (appId, block, input) => request(appPath(appId, `/blocks/ai/${encodeURIComponent(block)}/run`), { method: 'POST', body: input }),
+        runVideo: (appId, block, input) => request(appPath(appId, `/blocks/video/${encodeURIComponent(block)}/run`), { method: 'POST', body: input }),
+        saveStorage: (appId, input) => request(appPath(appId, '/storage/save'), { method: 'POST', body: input }),
       },
     },
     runtimeSettings: {

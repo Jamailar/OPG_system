@@ -3,6 +3,7 @@ import { AdminRoleGuard } from '../../common/guards/admin-role.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PlatformAdminAccessGuard } from '../../common/guards/platform-admin-access.guard';
 import { AppFunctionsModule } from '../app-functions/app-functions.module';
+import { AppBlocksModule } from '../app-blocks/app-blocks.module';
 import { AppSchemaModule } from '../app-schema/app-schema.module';
 import { DeveloperSdkAuthGuard } from '../developer-sdk/developer-sdk-auth.guard';
 import { RealtimeModule } from '../realtime/realtime.module';
@@ -11,7 +12,7 @@ import { AppWorkflowsPlatformController } from './app-workflows-platform.control
 import { AppWorkflowsService } from './app-workflows.service';
 
 @Module({
-  imports: [AppSchemaModule, AppFunctionsModule, RealtimeModule],
+  imports: [AppSchemaModule, AppFunctionsModule, AppBlocksModule, RealtimeModule],
   controllers: [AppWorkflowsPlatformController, AppWorkflowsAppController],
   providers: [AppWorkflowsService, JwtAuthGuard, AdminRoleGuard, PlatformAdminAccessGuard, DeveloperSdkAuthGuard],
   exports: [AppWorkflowsService],

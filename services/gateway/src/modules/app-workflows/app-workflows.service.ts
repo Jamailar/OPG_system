@@ -6,6 +6,7 @@ import IORedis from 'ioredis';
 import configuration from '../../config/configuration';
 import { PRISMA_CLIENT } from '../../config/database.module';
 import { AppFunctionsService } from '../app-functions/app-functions.service';
+import { AppBlocksService } from '../app-blocks/app-blocks.service';
 import { AppSchemaService } from '../app-schema/app-schema.service';
 import { RealtimeEventsService } from '../realtime/realtime-events.service';
 import { AppWorkflowRow, AppWorkflowRunRow, WorkflowStepDefinition } from './app-workflows.types';
@@ -25,6 +26,7 @@ export class AppWorkflowsService implements OnModuleInit, OnApplicationShutdown 
     @Inject(configuration.KEY) private readonly config: ConfigType<typeof configuration>,
     private readonly appSchemaService: AppSchemaService,
     private readonly appFunctionsService: AppFunctionsService,
+    private readonly appBlocksService: AppBlocksService,
     private readonly realtimeEventsService: RealtimeEventsService,
   ) {}
 
@@ -194,8 +196,14 @@ export class AppWorkflowsService implements OnModuleInit, OnApplicationShutdown 
       if (!table) throw new BadRequestException('data.create step requires table');
       return this.appSchemaService.createRow(appSlug, table, actor, this.jsonObject(input));
     }
-    if (['ai.generate_text', 'video.generate', 'storage.save'].includes(type)) {
-      return { queued: false, adapter: type, input, status: 'SKIPPED_UNBOUND' };
+    if (type === 'ai.generate_text') {
+      return this.appBlocksService.runAiBlock(appSlug, String(step.block || step.ai_block || step.slug || ''), actor, this.jsonObject(input));
+    }
+    if (type === 'video.generate') {
+      return this.appBlocksService.runVideoBlock(appSlug, String(step.block || step.video_block || step.slug || ''), actor, this.jsonObject(input));
+    }
+    if (type === 'storage.save') {
+      return this.appBlocksService.saveStorageObject(appSlug, actor, this.jsonObject(input));
     }
     throw new BadRequestException(`Unsupported workflow step type: ${type}`);
   }

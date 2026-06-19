@@ -86,6 +86,10 @@ async function main() {
     await runWorkflowCommand(args.slice(1));
     return;
   }
+  if (command === 'block' || command === 'blocks') {
+    await runBlockCommand(args.slice(1));
+    return;
+  }
   if (command === 'app' || command === 'apps') {
     await runAppCommand(args.slice(1));
     return;
@@ -529,6 +533,48 @@ async function runWorkflowCommand(commandArgs: string[]) {
   throw new Error(`Unknown workflow command: ${action}`);
 }
 
+async function runBlockCommand(commandArgs: string[]) {
+  const resource = commandArgs[0] || 'ai';
+  const action = commandArgs[1] || 'upsert';
+  const flags = parseFlags(commandArgs.slice(2));
+  const positionals = positionalArgs(commandArgs.slice(2));
+  const local = await readOptionalLocalConfig();
+  const appId = flags.appId || flags['app-id'] || flags.app || local.app || '';
+  if (!appId) {
+    throw new Error('Missing app id or slug. Use --app-id <id-or-slug> or run opg app use <slug>.');
+  }
+  const client = await getPlatformClientFromLocalConfigWithFlagOverrides(flags);
+  if (resource === 'ai') {
+    if (action === 'upsert' || action === 'create') {
+      printJson(await client.apps.blocks.upsertAi(appId, parseJsonPayload(flags)));
+      return;
+    }
+    if (action === 'run') {
+      const block = flags.block || flags.slug || positionals[0] || '';
+      if (!block) throw new Error('Missing AI block slug. Use: opg block ai run <slug> --json {...}');
+      printJson(await client.apps.blocks.runAi(appId, block, parseJsonPayload(flags)));
+      return;
+    }
+  }
+  if (resource === 'video') {
+    if (action === 'upsert' || action === 'create') {
+      printJson(await client.apps.blocks.upsertVideo(appId, parseJsonPayload(flags)));
+      return;
+    }
+    if (action === 'run') {
+      const block = flags.block || flags.slug || positionals[0] || '';
+      if (!block) throw new Error('Missing video block slug. Use: opg block video run <slug> --json {...}');
+      printJson(await client.apps.blocks.runVideo(appId, block, parseJsonPayload(flags)));
+      return;
+    }
+  }
+  if (resource === 'storage' && action === 'save') {
+    printJson(await client.apps.blocks.saveStorage(appId, parseJsonPayload(flags)));
+    return;
+  }
+  throw new Error(`Unknown block command: ${resource} ${action}`);
+}
+
 async function runAppCommand(commandArgs: string[]) {
   const action = commandArgs[0] || 'list';
   const flags = parseFlags(commandArgs.slice(1));
@@ -900,6 +946,39 @@ async function startMcpServer() {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ slug, payload }: any) => toToolResult(await client.workflows.run(slug, payload)),
+  );
+
+  registerTool(
+    'opg_ai_block_upsert',
+    {
+      title: 'Upsert OPG AI Block',
+      description: 'Create or update an app AI block backed by OPG AI Gateway.',
+      inputSchema: { appId: z.string().min(1), payload: z.record(z.unknown()) },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appId, payload }: any) => toToolResult(await platformClient.apps.blocks.upsertAi(appId, payload)),
+  );
+
+  registerTool(
+    'opg_video_block_upsert',
+    {
+      title: 'Upsert OPG Video Block',
+      description: 'Create or update an app video block backed by OPG async video gateway.',
+      inputSchema: { appId: z.string().min(1), payload: z.record(z.unknown()) },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appId, payload }: any) => toToolResult(await platformClient.apps.blocks.upsertVideo(appId, payload)),
+  );
+
+  registerTool(
+    'opg_storage_object_save',
+    {
+      title: 'Save OPG Storage Object',
+      description: 'Save a small text object through the app storage registry.',
+      inputSchema: { appId: z.string().min(1), payload: z.record(z.unknown()) },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ appId, payload }: any) => toToolResult(await platformClient.apps.blocks.saveStorage(appId, payload)),
   );
 
   registerTool(
@@ -1999,7 +2078,7 @@ function parseScopesFlag(flags: Record<string, string>) {
   return raw.split(',').map((item) => item.trim()).filter(Boolean);
 }
 
-type HelpTopic = 'root' | 'init' | 'login' | 'app' | 'db' | 'schema' | 'data' | 'function' | 'workflow' | 'platform' | 'codex' | 'mcp';
+type HelpTopic = 'root' | 'init' | 'login' | 'app' | 'db' | 'schema' | 'data' | 'function' | 'workflow' | 'block' | 'platform' | 'codex' | 'mcp';
 
 function isHelpRequest(commandArgs: string[]) {
   return commandArgs.length === 0 || commandArgs.some(isHelpToken);
@@ -2015,7 +2094,8 @@ function resolveHelpTopic(commandArgs: string[]): HelpTopic {
   if (firstTopic === 'apps') return 'app';
   if (firstTopic === 'functions') return 'function';
   if (firstTopic === 'workflows') return 'workflow';
-  if (['init', 'login', 'app', 'db', 'schema', 'data', 'function', 'workflow', 'platform', 'codex', 'mcp'].includes(firstTopic)) {
+  if (firstTopic === 'blocks') return 'block';
+  if (['init', 'login', 'app', 'db', 'schema', 'data', 'function', 'workflow', 'block', 'platform', 'codex', 'mcp'].includes(firstTopic)) {
     return firstTopic as HelpTopic;
   }
   return 'root';
@@ -2206,6 +2286,18 @@ Notes:
     return;
   }
 
+  if (topic === 'block') {
+    console.log(`OPG CLI - block
+
+Usage:
+  opg block ai upsert --app-id <app> --json '{"slug":"copy","prompt_template":"Write {{topic}}"}'
+  opg block ai run copy --app-id <app> --json '{"input":{"topic":"launch"}}'
+  opg block video upsert --app-id <app> --json '{"slug":"product_video"}'
+  opg block storage save --app-id <app> --json '{"bucket":"default","filename":"note.txt","content":"hello"}'
+`);
+    return;
+  }
+
   if (topic === 'platform') {
     console.log(`OPG CLI - platform
 
@@ -2301,6 +2393,7 @@ Core commands:
   data          Read and write registered app data rows.
   function      Create, deploy, invoke, and inspect app functions.
   workflow      Create, run, and inspect app workflows.
+  block         Create and run AI/video/storage blocks.
   platform      Call platform control-plane APIs.
   codex         Write Codex MCP config.
   mcp           Start MCP server over stdio.
@@ -2325,6 +2418,7 @@ Help:
   opg schema --help
   opg data --help
   opg function --help
+  opg block --help
   opg workflow --help
   opg platform --help
 `);
