@@ -9,11 +9,12 @@ import { DeveloperSdkAuthGuard } from '../developer-sdk/developer-sdk-auth.guard
 import { AppDataController } from './app-data.controller';
 import { AppSchemaPlatformController } from './app-schema-platform.controller';
 import { AppSchemaService } from './app-schema.service';
+import { PolicyEngineService } from './policy-engine.service';
 
 @Module({
   imports: [AuthModule, AppApiKeysModule, DeveloperAuthorizationModule],
   controllers: [AppSchemaPlatformController, AppDataController],
-  providers: [AppSchemaService, JwtAuthGuard, AdminRoleGuard, PlatformAdminAccessGuard, DeveloperSdkAuthGuard],
-  exports: [AppSchemaService],
+  providers: [AppSchemaService, PolicyEngineService, JwtAuthGuard, AdminRoleGuard, PlatformAdminAccessGuard, DeveloperSdkAuthGuard],
+  exports: [AppSchemaService, PolicyEngineService],
 })
 export class AppSchemaModule {}

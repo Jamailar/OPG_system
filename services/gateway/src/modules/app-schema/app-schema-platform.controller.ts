@@ -35,4 +35,15 @@ export class AppSchemaPlatformController {
   ) {
     return this.appSchemaService.addColumn(appId, table, req.user, body || {});
   }
+
+  @Post('apps/:app_id/schema/tables/:table/policies')
+  @ApiOperation({ summary: '创建或更新 app 数据表访问策略' })
+  async upsertAppDataPolicy(
+    @Req() req: any,
+    @Param('app_id') appId: string,
+    @Param('table') table: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.appSchemaService.upsertPolicy(appId, table, req.user, body || {});
+  }
 }

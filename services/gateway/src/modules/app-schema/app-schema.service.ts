@@ -12,7 +12,9 @@ import {
   CreateAppDataColumnInput,
   CreateAppDataTableInput,
   AppSchemaApp,
+  UpsertAppDataPolicyInput,
 } from './app-schema.types';
+import { PolicyEngineService } from './policy-engine.service';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const IDENTIFIER_RE = /^[a-z][a-z0-9_]{1,78}$/;
@@ -38,6 +40,7 @@ export class AppSchemaService {
   constructor(
     @Inject(PRISMA_CLIENT) private readonly prisma: PrismaClient,
     private readonly developerAuthorizationService: DeveloperAuthorizationService,
+    private readonly policyEngineService: PolicyEngineService,
   ) {}
 
   async getManifest(appRef: string) {
@@ -377,6 +380,83 @@ export class AppSchemaService {
     };
   }
 
+  async upsertPolicy(appRef: string, tableRef: string, actor: any, input: UpsertAppDataPolicyInput) {
+    const app = await this.resolveApp(appRef);
+    const table = await this.resolveTable(app.id, tableRef);
+    const columns = await this.listColumnsForTable(app.id, table.id);
+    const actorUserId = this.actorUserId(actor);
+    const apiKeyId = this.optionalUuid(actor?.apiKeyId);
+    const template = String(input?.template || '').trim();
+    const policies = template
+      ? this.policyEngineService.templatePolicy(template, table).map((policy) => ({ ...policy, status: 'ACTIVE' }))
+      : [this.normalizePolicyInput(input)];
+    const created: Array<{ id: string; action: string; effect: string; roles: string[]; condition: unknown; field_mask: unknown }> = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const policy of policies) {
+        this.policyEngineService.validatePolicy({ columns, condition: policy.condition, fieldMask: policy.field_mask });
+        const rows = input?.id && !template
+          ? await (tx.$queryRawUnsafe(
+              `
+                UPDATE app_data_policies
+                   SET action = $1, effect = $2, roles_json = $3::jsonb,
+                       condition_json = $4::jsonb, field_mask_json = $5::jsonb,
+                       status = $6, updated_at = now()
+                 WHERE id = $7::uuid
+                   AND app_id = $8::uuid
+                   AND table_id = $9::uuid
+                RETURNING id
+              `,
+              policy.action,
+              policy.effect,
+              JSON.stringify(policy.roles),
+              JSON.stringify(policy.condition),
+              JSON.stringify(policy.field_mask),
+              policy.status,
+              input.id,
+              app.id,
+              table.id,
+            ) as Promise<Array<{ id: string }>>)
+          : await (tx.$queryRawUnsafe(
+              `
+                INSERT INTO app_data_policies (
+                  app_id, table_id, action, effect, roles_json, condition_json, field_mask_json, status
+                ) VALUES ($1::uuid, $2::uuid, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8)
+                RETURNING id
+              `,
+              app.id,
+              table.id,
+              policy.action,
+              policy.effect,
+              JSON.stringify(policy.roles),
+              JSON.stringify(policy.condition),
+              JSON.stringify(policy.field_mask),
+              policy.status,
+            ) as Promise<Array<{ id: string }>>);
+        const policyId = rows[0]?.id;
+        if (!policyId) {
+          throw new NotFoundException('Policy not found');
+        }
+        created.push({ id: policyId, ...policy });
+        await this.recordSchemaEventTx(tx, app.id, actorUserId, apiKeyId, 'policy', policyId, input?.id ? 'schema.policy.updated' : 'schema.policy.created', null, {
+          table: table.slug,
+          action: policy.action,
+          effect: policy.effect,
+          roles: policy.roles,
+          condition: policy.condition,
+          field_mask: policy.field_mask,
+        }, null);
+      }
+    });
+
+    return {
+      ok: true,
+      app: this.serializeApp(app),
+      table: this.serializeTableRef(table),
+      policies: created,
+    };
+  }
+
   async getDataSchema(appRef: string, actor: any) {
     const { app } = await this.assertDataAccess(appRef, actor, 'read');
     const manifest = await this.getManifest(app.id);
@@ -400,15 +480,23 @@ export class AppSchemaService {
   }
 
   async listRows(appRef: string, tableRef: string, actor: any, query: Record<string, unknown>) {
-    const { app, table, columns } = await this.resolveDataRequest(appRef, tableRef, actor, 'read');
-    const selectedColumns = this.resolveSelectedColumns(columns, query?.select);
+    const { app, table, columns, policies, policyActor } = await this.resolveDataRequest(appRef, tableRef, actor, 'read');
     const limit = this.normalizeLimit(query?.limit);
-    const order = this.resolveOrder(columns, query?.order, table.primary_key);
+    const readPolicy = this.policyEngineService.compileReadPolicy({ table, columns, policies, actor: policyActor, paramOffset: 0 });
+    const selectedColumns = this.resolveSelectedColumns(readPolicy.visibleColumns, query?.select);
+    const order = this.resolveOrder(readPolicy.visibleColumns, query?.order, table.primary_key);
     const filters = this.resolveFilters(columns, query);
     const whereParts = [...filters.sql];
     const params = [...filters.params];
     if (table.soft_delete_column && columns.some((column) => column.slug === table.soft_delete_column)) {
       whereParts.push(`${this.q(table.soft_delete_column)} IS NULL`);
+    }
+    if (readPolicy.params.length) {
+      const rebased = this.rebaseSqlParams(readPolicy.where, params.length);
+      whereParts.push(...rebased.sql);
+      params.push(...readPolicy.params);
+    } else {
+      whereParts.push(...readPolicy.where);
     }
     const sql = [
       `SELECT ${selectedColumns.map((column) => this.q(column.physical_column_name)).join(', ')}`,
@@ -431,18 +519,21 @@ export class AppSchemaService {
   }
 
   async getRow(appRef: string, tableRef: string, id: string, actor: any, query: Record<string, unknown>) {
-    const { app, table, columns } = await this.resolveDataRequest(appRef, tableRef, actor, 'read');
-    const selectedColumns = this.resolveSelectedColumns(columns, query?.select);
+    const { app, table, columns, policies, policyActor } = await this.resolveDataRequest(appRef, tableRef, actor, 'read');
+    const readPolicy = this.policyEngineService.compileReadPolicy({ table, columns, policies, actor: policyActor, paramOffset: 1 });
+    const selectedColumns = this.resolveSelectedColumns(readPolicy.visibleColumns, query?.select);
     const whereParts = [`${this.q(table.primary_key)} = $1`];
     if (table.soft_delete_column && columns.some((column) => column.slug === table.soft_delete_column)) {
       whereParts.push(`${this.q(table.soft_delete_column)} IS NULL`);
     }
+    whereParts.push(...readPolicy.where);
     const rows = await (this.prisma.$queryRawUnsafe(
       `SELECT ${selectedColumns.map((column) => this.q(column.physical_column_name)).join(', ')}
          FROM ${this.q(table.physical_table_name)}
         WHERE ${whereParts.join(' AND ')}
         LIMIT 1`,
       id,
+      ...readPolicy.params,
     ) as Promise<Record<string, unknown>[]>);
     const row = rows[0];
     if (!row) {
@@ -457,9 +548,13 @@ export class AppSchemaService {
   }
 
   async createRow(appRef: string, tableRef: string, actor: any, body: Record<string, unknown>) {
-    const { app, table, columns } = await this.resolveDataRequest(appRef, tableRef, actor, 'write');
+    const { app, table, columns, policies, policyActor } = await this.resolveDataRequest(appRef, tableRef, actor, 'write');
     const writable = columns.filter((column) => !column.is_readonly && !['id', 'created_at', 'updated_at', table.soft_delete_column || ''].includes(column.slug));
     const payload = this.pickWritablePayload(writable, body || {});
+    if (!policyActor.privileged && table.owner_column && policyActor.userId && !Object.prototype.hasOwnProperty.call(payload, table.owner_column)) {
+      payload[table.owner_column] = policyActor.userId;
+    }
+    this.policyEngineService.assertCreateAllowed({ columns, policies, actor: policyActor, payload });
     const insertColumns = Object.keys(payload);
     const values = Object.values(payload);
     const returning = this.visibleColumns(columns);
@@ -481,7 +576,7 @@ export class AppSchemaService {
   }
 
   async updateRow(appRef: string, tableRef: string, id: string, actor: any, body: Record<string, unknown>) {
-    const { app, table, columns } = await this.resolveDataRequest(appRef, tableRef, actor, 'write');
+    const { app, table, columns, policies, policyActor } = await this.resolveDataRequest(appRef, tableRef, actor, 'write');
     const writable = columns.filter((column) => !column.is_readonly && !['id', 'created_at', 'updated_at', table.soft_delete_column || ''].includes(column.slug));
     const payload = this.pickWritablePayload(writable, body || {});
     if (columns.some((column) => column.slug === 'updated_at')) {
@@ -493,10 +588,14 @@ export class AppSchemaService {
     }
     const values = Object.values(payload);
     const returning = this.visibleColumns(columns);
-    const whereParts = [`${this.q(table.primary_key)} = $${values.length + 1}`];
+    const params = [...values, id];
+    const whereParts = [`${this.q(table.primary_key)} = $${params.length}`];
     if (table.soft_delete_column && columns.some((column) => column.slug === table.soft_delete_column)) {
       whereParts.push(`${this.q(table.soft_delete_column)} IS NULL`);
     }
+    const writePolicy = this.policyEngineService.compileRowWritePolicy({ columns, policies, actor: policyActor, action: 'update', paramOffset: params.length });
+    whereParts.push(...writePolicy.where);
+    params.push(...writePolicy.params);
     const rows = await (this.prisma.$queryRawUnsafe(
       `
         UPDATE ${this.q(table.physical_table_name)}
@@ -504,8 +603,7 @@ export class AppSchemaService {
          WHERE ${whereParts.join(' AND ')}
         RETURNING ${returning.map((column) => this.q(column.physical_column_name)).join(', ')}
       `,
-      ...values,
-      id,
+      ...params,
     ) as Promise<Record<string, unknown>[]>);
     const row = rows[0];
     if (!row) {
@@ -521,9 +619,11 @@ export class AppSchemaService {
   }
 
   async deleteRow(appRef: string, tableRef: string, id: string, actor: any) {
-    const { app, table, columns } = await this.resolveDataRequest(appRef, tableRef, actor, 'write');
+    const { app, table, columns, policies, policyActor } = await this.resolveDataRequest(appRef, tableRef, actor, 'write');
     const hasSoftDelete = !!table.soft_delete_column && columns.some((column) => column.slug === table.soft_delete_column);
     const returning = this.visibleColumns(columns);
+    const writePolicy = this.policyEngineService.compileRowWritePolicy({ columns, policies, actor: policyActor, action: 'delete', paramOffset: 1 });
+    const policyWhere = writePolicy.where.length ? ` AND ${writePolicy.where.join(' AND ')}` : '';
     const rows = await (this.prisma.$queryRawUnsafe(
       hasSoftDelete
         ? `
@@ -531,14 +631,17 @@ export class AppSchemaService {
                SET ${this.q(table.soft_delete_column!)} = now()
              WHERE ${this.q(table.primary_key)} = $1
                AND ${this.q(table.soft_delete_column!)} IS NULL
+               ${policyWhere}
             RETURNING ${returning.map((column) => this.q(column.physical_column_name)).join(', ')}
           `
         : `
             DELETE FROM ${this.q(table.physical_table_name)}
              WHERE ${this.q(table.primary_key)} = $1
+               ${policyWhere}
             RETURNING ${returning.map((column) => this.q(column.physical_column_name)).join(', ')}
           `,
       id,
+      ...writePolicy.params,
     ) as Promise<Record<string, unknown>[]>);
     const row = rows[0];
     if (!row) {
@@ -652,8 +755,11 @@ export class AppSchemaService {
   private async resolveDataRequest(appRef: string, tableRef: string, actor: any, mode: 'read' | 'write') {
     const { app } = await this.assertDataAccess(appRef, actor, mode);
     const table = await this.resolveTable(app.id, tableRef);
-    const columns = await this.listColumnsForTable(app.id, table.id);
-    return { app, table, columns };
+    const [columns, policies] = await Promise.all([
+      this.listColumnsForTable(app.id, table.id),
+      this.listPoliciesForTable(app.id, table.id),
+    ]);
+    return { app, table, columns, policies, policyActor: this.policyEngineService.buildActorContext(app.id, actor) };
   }
 
   private async assertDataAccess(appRef: string, actor: any, mode: 'read' | 'write') {
@@ -671,7 +777,10 @@ export class AppSchemaService {
     if (String(actor?.role || '').toUpperCase() === 'ADMIN') {
       return { app };
     }
-    throw new ForbiddenException('Data API access requires app admin, app API key, or developer grant');
+    if (actor?.userId || actor?.id) {
+      return { app };
+    }
+    throw new ForbiddenException('Data API access requires authenticated app user, app admin, app API key, or developer grant');
   }
 
   private async listColumnsForTable(appId: string, tableId: string) {
@@ -714,6 +823,22 @@ export class AppSchemaService {
         ORDER BY table_id ASC, action ASC, created_at ASC
       `,
       appId,
+    ) as Promise<AppDataPolicyRow[]>;
+  }
+
+  private async listPoliciesForTable(appId: string, tableId: string) {
+    return this.prisma.$queryRawUnsafe(
+      `
+        SELECT id, table_id, action, effect, roles_json, condition_json, field_mask_json,
+               status, created_at, updated_at
+        FROM app_data_policies
+        WHERE app_id = $1::uuid
+          AND table_id = $2::uuid
+          AND status = 'ACTIVE'
+        ORDER BY action ASC, created_at ASC
+      `,
+      appId,
+      tableId,
     ) as Promise<AppDataPolicyRow[]>;
   }
 
@@ -816,6 +941,35 @@ export class AppSchemaService {
       throw new BadRequestException('No writable fields provided');
     }
     return payload;
+  }
+
+  private normalizePolicyInput(input: UpsertAppDataPolicyInput) {
+    const action = String(input?.action || 'read').trim().toLowerCase();
+    const effect = String(input?.effect || 'allow').trim().toLowerCase();
+    const status = String(input?.status || 'ACTIVE').trim().toUpperCase();
+    if (!['read', 'create', 'update', 'delete', 'all'].includes(action)) {
+      throw new BadRequestException('Invalid policy action');
+    }
+    if (!['allow', 'deny'].includes(effect)) {
+      throw new BadRequestException('Invalid policy effect');
+    }
+    if (!['ACTIVE', 'INACTIVE', 'DELETED'].includes(status)) {
+      throw new BadRequestException('Invalid policy status');
+    }
+    return {
+      action,
+      effect,
+      roles: Array.isArray(input?.roles) ? Array.from(new Set(input.roles.map((role) => String(role || '').trim().toUpperCase()).filter(Boolean))) : [],
+      condition: this.jsonObject(input?.condition),
+      field_mask: this.jsonObject(input?.field_mask ?? input?.fieldMask),
+      status,
+    };
+  }
+
+  private rebaseSqlParams(sql: string[], offset: number) {
+    return {
+      sql: sql.map((part) => part.replace(/\$(\d+)/g, (_, index) => `$${Number(index) + offset}`)),
+    };
   }
 
   private async recordDataEvent(appId: string, actor: any, tableId: string, action: string, rowId: unknown) {

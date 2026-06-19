@@ -102,3 +102,26 @@ export type AddAppDataColumnInput = CreateAppDataColumnInput & {
   dry_run?: boolean;
   dryRun?: boolean;
 };
+
+export type AppPolicyCondition =
+  | {
+      all?: AppPolicyCondition[];
+      any?: AppPolicyCondition[];
+    }
+  | {
+      field: string;
+      op: 'eq' | 'ne' | 'is_null' | 'not_null' | 'in';
+      value?: unknown;
+    };
+
+export type UpsertAppDataPolicyInput = {
+  id?: string;
+  action?: 'read' | 'create' | 'update' | 'delete' | 'all';
+  effect?: 'allow' | 'deny';
+  roles?: string[];
+  condition?: AppPolicyCondition | Record<string, unknown>;
+  field_mask?: Record<string, unknown>;
+  fieldMask?: Record<string, unknown>;
+  template?: string;
+  status?: 'ACTIVE' | 'INACTIVE' | 'DELETED';
+};
