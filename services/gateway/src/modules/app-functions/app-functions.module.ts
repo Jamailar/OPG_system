@@ -2,7 +2,10 @@ import { Module } from '@nestjs/common';
 import { AdminRoleGuard } from '../../common/guards/admin-role.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PlatformAdminAccessGuard } from '../../common/guards/platform-admin-access.guard';
+import { AppApiKeysModule } from '../api-keys/app-api-keys.module';
 import { AppSchemaModule } from '../app-schema/app-schema.module';
+import { AuthModule } from '../auth/auth.module';
+import { DeveloperAuthorizationModule } from '../developer-sdk/developer-authorization.module';
 import { DeveloperSdkAuthGuard } from '../developer-sdk/developer-sdk-auth.guard';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { AppFunctionsAppController } from './app-functions-app.controller';
@@ -10,7 +13,7 @@ import { AppFunctionsPlatformController } from './app-functions-platform.control
 import { AppFunctionsService } from './app-functions.service';
 
 @Module({
-  imports: [AppSchemaModule, RealtimeModule],
+  imports: [AuthModule, AppApiKeysModule, DeveloperAuthorizationModule, AppSchemaModule, RealtimeModule],
   controllers: [AppFunctionsPlatformController, AppFunctionsAppController],
   providers: [AppFunctionsService, JwtAuthGuard, AdminRoleGuard, PlatformAdminAccessGuard, DeveloperSdkAuthGuard],
   exports: [AppFunctionsService],
