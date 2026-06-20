@@ -773,13 +773,50 @@ async function runPlatformCommand(commandArgs: string[]) {
     }
   }
 
-  if (resource === 'runtime' || resource === 'runtime-settings') {
+  if (resource === 'runtime-settings') {
     if (action === 'get') {
       printJson(await client.runtimeSettings.get());
       return;
     }
     if (action === 'update') {
       printJson(await client.runtimeSettings.update(parseJsonPayload(flags)));
+      return;
+    }
+  }
+
+  if (resource === 'runtime') {
+    if (action === 'get') {
+      printJson(await client.runtimeSettings.get());
+      return;
+    }
+    if (action === 'update') {
+      printJson(await client.runtimeSettings.update(parseJsonPayload(flags)));
+      return;
+    }
+    if (action === 'overview') {
+      printJson(await client.runtime.overview(parseQueryPayload(flags)));
+      return;
+    }
+    if (action === 'refresh') {
+      printJson(await client.runtime.refresh());
+      return;
+    }
+    if (action === 'templates') {
+      printJson(await client.runtime.templates());
+      return;
+    }
+    if (action === 'app-overview' || action === 'app') {
+      printJson(await client.runtime.appOverview(requirePlatformAppId(flags), parseQueryPayload(flags)));
+      return;
+    }
+    if (action === 'refresh-app') {
+      printJson(await client.runtime.refreshApp(requirePlatformAppId(flags)));
+      return;
+    }
+    if (action === 'apply-template') {
+      const templateKey = flags.templateKey || flags['template-key'] || '';
+      if (!templateKey) throw new Error('Missing template key. Use: opg platform runtime apply-template --app-id <id> --template-key <key>');
+      printJson(await client.runtime.applyTemplate(requirePlatformAppId(flags), templateKey));
       return;
     }
   }
@@ -847,6 +884,82 @@ async function startMcpServer() {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ appId, payload }: any) => toToolResult(await platformClient.apps.update(appId, payload)),
+  );
+
+  registerTool(
+    'opg_platform_runtime_overview',
+    {
+      title: 'Get OPG Platform Runtime Overview',
+      description: 'Read the app module registry, template activity, and platform task runtime summary.',
+      inputSchema: {
+        query: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ query }: any) => toToolResult(await platformClient.runtime.overview(query)),
+  );
+
+  registerTool(
+    'opg_platform_runtime_refresh',
+    {
+      title: 'Refresh OPG Platform Runtime Registry',
+      description: 'Queue a background refresh of runtime modules for tenant apps.',
+      inputSchema: {},
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async () => toToolResult(await platformClient.runtime.refresh()),
+  );
+
+  registerTool(
+    'opg_platform_runtime_templates',
+    {
+      title: 'List OPG Runtime Templates',
+      description: 'List reusable app runtime templates for AI, video, auth, commerce, and content apps.',
+      inputSchema: {},
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async () => toToolResult(await platformClient.runtime.templates()),
+  );
+
+  registerTool(
+    'opg_platform_app_runtime_overview',
+    {
+      title: 'Get OPG App Runtime Overview',
+      description: 'Read one tenant app module registry, recent runtime runs, template applications, and tasks.',
+      inputSchema: {
+        appId: z.string().min(1).describe('Tenant app id or slug.'),
+        query: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appId, query }: any) => toToolResult(await platformClient.runtime.appOverview(appId, query)),
+  );
+
+  registerTool(
+    'opg_platform_app_runtime_refresh',
+    {
+      title: 'Refresh OPG App Runtime Registry',
+      description: 'Queue a background refresh of runtime modules for one tenant app.',
+      inputSchema: {
+        appId: z.string().min(1).describe('Tenant app id or slug.'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ appId }: any) => toToolResult(await platformClient.runtime.refreshApp(appId)),
+  );
+
+  registerTool(
+    'opg_platform_app_runtime_apply_template',
+    {
+      title: 'Apply OPG App Runtime Template',
+      description: 'Queue a background task that applies a runtime template to one tenant app.',
+      inputSchema: {
+        appId: z.string().min(1).describe('Tenant app id or slug.'),
+        templateKey: z.string().min(1).describe('Runtime template key, for example ai-text-app.'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ appId, templateKey }: any) => toToolResult(await platformClient.runtime.applyTemplate(appId, templateKey)),
   );
 
   registerTool(
@@ -1746,6 +1859,8 @@ function parseQueryPayload(flags: Record<string, string>): Record<string, string
     'body',
     'method',
     'path',
+    'template-key',
+    'templateKey',
   ]);
   const query: Record<string, string | number | boolean | null> = {};
   for (const [key, rawValue] of Object.entries(flags)) {
@@ -2353,6 +2468,12 @@ Usage:
   opg platform payments orders --app-id <id>
   opg platform runtime get
   opg platform runtime update --json '{...}'
+  opg platform runtime overview
+  opg platform runtime refresh
+  opg platform runtime templates
+  opg platform runtime app-overview --app-id <id>
+  opg platform runtime refresh-app --app-id <id>
+  opg platform runtime apply-template --app-id <id> --template-key ai-text-app
   opg platform request --path /storage/providers --method GET
 
 Options:
@@ -2367,7 +2488,8 @@ Options:
 Examples:
   opg platform apps list
   opg platform feedbacks list --app-id <id>
-  opg platform runtime get
+  opg platform runtime overview
+  opg platform runtime apply-template --app-id <id> --template-key ai-video-app
   opg platform request --path /storage/providers --method GET
 `);
     return;

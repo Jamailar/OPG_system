@@ -267,6 +267,14 @@ export type OpgPlatformClient = {
     get(): Promise<Record<string, unknown>>;
     update(input: Record<string, unknown>): Promise<Record<string, unknown>>;
   };
+  runtime: {
+    overview(query?: OpgQuery): Promise<Record<string, unknown>>;
+    refresh(): Promise<Record<string, unknown>>;
+    templates(): Promise<Record<string, unknown>>;
+    appOverview(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+    refreshApp(appId: string): Promise<Record<string, unknown>>;
+    applyTemplate(appId: string, templateKey: string): Promise<Record<string, unknown>>;
+  };
   observability: {
     runtime(): Promise<Record<string, unknown>>;
     requestEvents(query?: OpgQuery): Promise<Record<string, unknown>>;
@@ -832,6 +840,15 @@ export function createOpgPlatformClient(options: OpgClientOptions): OpgPlatformC
     runtimeSettings: {
       get: () => request('/runtime-settings'),
       update: (input) => request('/runtime-settings', { method: 'PATCH', body: input }),
+    },
+    runtime: {
+      overview: (query) => request('/runtime/overview', { query }),
+      refresh: () => request('/runtime/refresh', { method: 'POST', body: {} }),
+      templates: () => request('/runtime/templates'),
+      appOverview: (appId, query) => request(appPath(appId, '/runtime/overview'), { query }),
+      refreshApp: (appId) => request(appPath(appId, '/runtime/refresh'), { method: 'POST', body: {} }),
+      applyTemplate: (appId, templateKey) =>
+        request(appPath(appId, `/runtime/templates/${encodeURIComponent(templateKey)}/apply`), { method: 'POST', body: {} }),
     },
     observability: {
       runtime: () => request('/observability/runtime'),

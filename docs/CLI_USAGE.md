@@ -149,6 +149,17 @@ opg platform payments products --app-id <app-id>
 opg platform payments orders --app-id <app-id> --page 1
 ```
 
+读取和维护 Runtime Registry：
+
+```bash
+opg platform runtime overview
+opg platform runtime templates
+opg platform runtime refresh
+opg platform runtime app-overview --app-id <app-id>
+opg platform runtime refresh-app --app-id <app-id>
+opg platform runtime apply-template --app-id <app-id> --template-key ai-text-app
+```
+
 通用平台 API 调用：
 
 ```bash
@@ -225,6 +236,12 @@ opg mcp
 - `opg_platform_app_analytics_users`
 - `opg_platform_app_ai_usage_logs`
 - `opg_platform_app_payment_orders`
+- `opg_platform_runtime_overview`
+- `opg_platform_runtime_refresh`
+- `opg_platform_runtime_templates`
+- `opg_platform_app_runtime_overview`
+- `opg_platform_app_runtime_refresh`
+- `opg_platform_app_runtime_apply_template`
 - `opg_database_manifest_get`
 - `opg_database_query`
 - `opg_database_execute`

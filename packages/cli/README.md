@@ -49,6 +49,11 @@ opg platform apps list
 opg platform apps create --json '{"kind":"WEBSITE","name":"Demo App","slug":"demo"}'
 opg platform runtime get
 opg platform runtime update --json '{"api_base_url":"https://opg.example.com"}'
+opg platform runtime overview
+opg platform runtime templates
+opg platform runtime refresh
+opg platform runtime app-overview --app-id <app-id>
+opg platform runtime apply-template --app-id <app-id> --template-key ai-video-app
 opg platform feedbacks list --app-id <app-id> --status open
 opg platform feedbacks get --app-id <app-id> --feedback-id <feedback-id>
 opg platform feedbacks update --app-id <app-id> --feedback-id <feedback-id> --json '{"status":"triaged"}'
@@ -70,8 +75,8 @@ opg platform request --path /storage/providers --method GET
 ```
 
 The MCP server also exposes platform tools for app creation, runtime settings,
-storage providers, AI sources/models, app feedback, app analytics, app AI usage,
-app payment orders, and a generic `opg_platform_request` escape hatch for other
+runtime registry/templates, storage providers, AI sources/models, app feedback,
+app analytics, app AI usage, app payment orders, and a generic `opg_platform_request` escape hatch for other
 `/api/v1/platform-admin/*` endpoints.
 
 Common app-data MCP tools:
@@ -85,6 +90,12 @@ Common app-data MCP tools:
 - `opg_platform_app_analytics_users`
 - `opg_platform_app_ai_usage_logs`
 - `opg_platform_app_payment_orders`
+- `opg_platform_runtime_overview`
+- `opg_platform_runtime_refresh`
+- `opg_platform_runtime_templates`
+- `opg_platform_app_runtime_overview`
+- `opg_platform_app_runtime_refresh`
+- `opg_platform_app_runtime_apply_template`
 
 ## Codex Database Tools
 
