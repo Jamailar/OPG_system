@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/opg-system-preview.png" alt="OPG System Preview" width="860">
+  <img src="https://raw.githubusercontent.com/Jamailar/OPG/main/docs/assets/opg-system-preview.png" alt="OPG System Preview" width="860">
 </p>
 
 <h1 align="center">一人集团系统</h1>

@@ -185,8 +185,6 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.prepare.outputs.tag }}
 
       - name: Update Docker Hub repository description
         uses: peter-evans/dockerhub-description@v5
