@@ -17,6 +17,10 @@
 </p>
 
 <p align="center">
+  简体中文 · <a href="README.en.md">English</a>
+</p>
+
+<p align="center">
   <img alt="Node.js 22+" src="https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white">
   <img alt="React" src="https://img.shields.io/badge/Web-React%20%2B%20Vite-61DAFB?logo=react&logoColor=111111">
   <img alt="NestJS" src="https://img.shields.io/badge/API-NestJS-E0234E?logo=nestjs&logoColor=white">
@@ -52,6 +56,102 @@ OPG 不追求做通用后端平台。产品核心是面向一人公司的多 app
 
 ## Quickstart
 
+优先选择 Docker 部署。源码启动主要用于开发 OPG 本身，不建议作为普通用户的第一种部署方式。
+
+| 方式 | 推荐场景 | 构建来源 | 依赖 |
+| --- | --- | --- | --- |
+| 直接拉 Docker 镜像 | 试用、生产、交给用户部署 | GHCR 发布镜像 | 外部 PostgreSQL / Redis，或配合 `docker-compose.release.yml` 启动 |
+| 克隆源码 + Docker Compose | 本机试用、私有化部署、需要一起启动 PostgreSQL/Redis | 本地 Dockerfile | Docker / Docker Compose |
+| 克隆源码 + Dockerfile | 自己接外部数据库、云平台构建、Coolify/Render/Railway 等 | 本地 Dockerfile target | 外部 PostgreSQL / Redis |
+| 源码 dev 启动 | 开发 OPG、调试前后端 | Node.js workspace | Node.js 22+、PostgreSQL、Redis |
+
+### 方式一：直接拉 Docker 镜像（推荐）
+
+如果已有 PostgreSQL 和 Redis，直接运行发布版单容器镜像。单容器镜像包含 Gateway API 和 Web 管理后台，统一暴露 `3000` 端口。
+
+```bash
+docker pull ghcr.io/jamailar/opg-system:latest
+
+docker run --rm -p 3000:3000 \
+  -e NODE_ENV=production \
+  -e PORT=3000 \
+  -e DATABASE_URL='postgresql://opg:password@postgres.example.com:5432/opg' \
+  -e REDIS_URL='redis://redis.example.com:6379/0' \
+  -e JWT_SECRET_KEY='replace-with-long-random-secret' \
+  -e PLATFORM_SECRETS_KEY='replace-with-long-random-secret' \
+  ghcr.io/jamailar/opg-system:latest
+```
+
+如果希望应用、PostgreSQL、Redis 一起由 Compose 编排，使用发布版 Compose 文件：
+
+```bash
+git clone https://github.com/Jamailar/OPG_system.git
+cd OPG_system
+
+OPG_IMAGE=ghcr.io/jamailar/opg-system:latest \
+JWT_SECRET_KEY='replace-with-long-random-secret' \
+PLATFORM_SECRETS_KEY='replace-with-long-random-secret' \
+POSTGRES_PASSWORD='replace-with-strong-password' \
+docker compose -f docker-compose.release.yml up -d
+```
+
+启动后访问：
+
+```bash
+open http://localhost:3000
+```
+
+### 方式二：克隆源码，用 Docker Compose 构建
+
+适合本机完整试用或私有化部署。Compose 会从当前源码构建 `opg-all`，并同时启动 PostgreSQL 和 Redis。
+
+```bash
+git clone https://github.com/Jamailar/OPG_system.git
+cd OPG_system
+
+JWT_SECRET_KEY='replace-with-long-random-secret' \
+PLATFORM_SECRETS_KEY='replace-with-long-random-secret' \
+POSTGRES_PASSWORD='replace-with-strong-password' \
+docker compose up -d --build
+```
+
+修改宿主机端口：
+
+```bash
+OPG_PORT=8080 docker compose up -d --build
+```
+
+### 方式三：克隆源码，用 Dockerfile 构建单镜像
+
+适合云平台构建或接入外部数据库/Redis。默认推荐 `opg-all` target，它把 Gateway API 和 Web 静态资源打进同一个应用镜像。
+
+```bash
+git clone https://github.com/Jamailar/OPG_system.git
+cd OPG_system
+
+docker build --target opg-all -t opg-system:local .
+
+docker run --rm -p 3000:3000 \
+  -e NODE_ENV=production \
+  -e PORT=3000 \
+  -e DATABASE_URL='postgresql://opg:password@postgres.example.com:5432/opg' \
+  -e REDIS_URL='redis://redis.example.com:6379/0' \
+  -e JWT_SECRET_KEY='replace-with-long-random-secret' \
+  -e PLATFORM_SECRETS_KEY='replace-with-long-random-secret' \
+  opg-system:local
+```
+
+需要前后端分离部署时，构建独立 target：
+
+```bash
+docker build --target gateway-runtime -t opg-gateway:local .
+docker build --target web-runtime -t opg-web:local .
+```
+
+### 方式四：源码开发启动
+
+适合开发 OPG 本身。启动前需要准备 PostgreSQL、Redis，并按 `services/gateway` 的环境变量约定提供连接信息。
+
 ```bash
 git clone https://github.com/Jamailar/OPG_system.git
 cd OPG_system
@@ -64,15 +164,17 @@ npm run gateway:dev
 npm run web:dev
 ```
 
-接入用户项目：
+### 接入用户项目
 
 ```bash
-npx -y @jamba/opg-cli init --base-url https://api.example.com
+npx -y @jamba/opg-cli init --base-url http://localhost:3000
 npx -y @jamba/opg-cli login
 npx -y @jamba/opg-cli app create --name "Your App" --slug your-app
 npx -y @jamba/opg-cli login --app your-app
 npx -y @jamba/opg-cli codex install
 ```
+
+生产环境把 `--base-url` 换成你的 OPG Gateway 域名，例如 `https://api.example.com`。CLI 会把当前项目绑定到 OPG app，后续 Codex/MCP/SDK 都通过这个授权访问同一套后端能力。
 
 冷启动只保留极少环境变量：`DATABASE_URL`、`REDIS_URL`、`JWT_SECRET_KEY`、`PLATFORM_SECRETS_KEY`、`NODE_ENV`、`PORT`。支付、对象存储、邮件、OAuth、AI 调优、域名、CORS 等业务配置优先走管理后台和数据库。
 
@@ -423,7 +525,8 @@ Infrastructure
 │   └── cli/                 # @jamba/opg-cli 初始化、平台操作与 MCP server
 ├── LICENSE
 ├── package.json
-└── README.md
+├── README.md
+└── README.en.md
 ```
 
 ## 本地启动与接入细节
@@ -577,6 +680,7 @@ docker run --rm -p 3000:3000 \
 - 前端说明：[apps/web/README.md](apps/web/README.md)
 - SDK 包说明：[packages/sdk/README.md](packages/sdk/README.md)
 - CLI 包说明：[packages/cli/README.md](packages/cli/README.md)
+- English README：[README.en.md](README.en.md)
 
 ## License
 
