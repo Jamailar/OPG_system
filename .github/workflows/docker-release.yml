@@ -175,6 +175,29 @@ jobs:
             /tmp/${{ matrix.name }}-${{ needs.prepare.outputs.version }}.tar.gz.sha256
           if-no-files-found: error
 
+  dockerhub-description:
+    name: Sync Docker Hub README
+    runs-on: ubuntu-latest
+    needs:
+      - prepare
+      - build
+    if: ${{ startsWith(needs.prepare.outputs.tag, 'opg-system/v') }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Update Docker Hub repository description
+        uses: peter-evans/dockerhub-description@v5
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}/opg-system
+          short-description: OPG System app backend control plane for one-person companies.
+          readme-filepath: README.md
+          enable-url-completion: true
+
   github-release:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
