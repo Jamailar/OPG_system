@@ -1,10 +1,8 @@
 # OPG Gateway 文档中心
 
-最后更新：2026-06-10
+最后更新：2026-06-20
 
 ## 快速导航
-- [环境变量完整清单](./ENVIRONMENT.md)
-- [环境变量精简方案](./ENV_STREAMLINING_PLAN.md)
 - [专题文档总览](./domains/README.md)
 - [账号管理专题](./domains/account-management.md)
 - [积分充值专题](./domains/points-recharge.md)

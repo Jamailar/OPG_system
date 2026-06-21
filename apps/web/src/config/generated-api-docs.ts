@@ -1750,6 +1750,1169 @@ export const GENERATED_API_DOC_MODULES: GeneratedApiDocModule[] = [
     ]
   },
   {
+    "module_name": "app-blocks",
+    "module_label": "App Blocks",
+    "module_summary": "覆盖 App Blocks 相关的接口能力，可用于按模块检索当前 app 可接入的 API。",
+    "module_doc_path": "services/gateway/docs/modules/app-blocks/README.md",
+    "route_count": 5,
+    "routes": [
+      {
+        "id": "app-blocks:AppBlocksPlatformController:POST:apps/:app_id/blocks/ai:upsertAiBlock",
+        "controller_name": "AppBlocksPlatformController",
+        "controller_tag": "AppBlocks",
+        "method": "POST",
+        "handler": "upsertAiBlock",
+        "summary": "Create or update an app AI block",
+        "route_path": "apps/{app_id}/blocks/ai",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/blocks/ai",
+          "/{app}/v1/platform-admin/apps/{app_id}/blocks/ai",
+          "/platform-admin/apps/{app_id}/blocks/ai"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-blocks/app-blocks-platform.controller.ts"
+      },
+      {
+        "id": "app-blocks:AppBlocksPlatformController:POST:apps/:app_id/blocks/ai/:block/run:runAiBlock",
+        "controller_name": "AppBlocksPlatformController",
+        "controller_tag": "AppBlocks",
+        "method": "POST",
+        "handler": "runAiBlock",
+        "summary": "Run an app AI block",
+        "route_path": "apps/{app_id}/blocks/ai/{block}/run",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/blocks/ai/{block}/run",
+          "/{app}/v1/platform-admin/apps/{app_id}/blocks/ai/{block}/run",
+          "/platform-admin/apps/{app_id}/blocks/ai/{block}/run"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-blocks/app-blocks-platform.controller.ts"
+      },
+      {
+        "id": "app-blocks:AppBlocksPlatformController:POST:apps/:app_id/blocks/video:upsertVideoBlock",
+        "controller_name": "AppBlocksPlatformController",
+        "controller_tag": "AppBlocks",
+        "method": "POST",
+        "handler": "upsertVideoBlock",
+        "summary": "Create or update an app video block",
+        "route_path": "apps/{app_id}/blocks/video",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/blocks/video",
+          "/{app}/v1/platform-admin/apps/{app_id}/blocks/video",
+          "/platform-admin/apps/{app_id}/blocks/video"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-blocks/app-blocks-platform.controller.ts"
+      },
+      {
+        "id": "app-blocks:AppBlocksPlatformController:POST:apps/:app_id/blocks/video/:block/run:runVideoBlock",
+        "controller_name": "AppBlocksPlatformController",
+        "controller_tag": "AppBlocks",
+        "method": "POST",
+        "handler": "runVideoBlock",
+        "summary": "Run an app video block",
+        "route_path": "apps/{app_id}/blocks/video/{block}/run",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/blocks/video/{block}/run",
+          "/{app}/v1/platform-admin/apps/{app_id}/blocks/video/{block}/run",
+          "/platform-admin/apps/{app_id}/blocks/video/{block}/run"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-blocks/app-blocks-platform.controller.ts"
+      },
+      {
+        "id": "app-blocks:AppBlocksPlatformController:POST:apps/:app_id/storage/save:saveStorageObject",
+        "controller_name": "AppBlocksPlatformController",
+        "controller_tag": "AppBlocks",
+        "method": "POST",
+        "handler": "saveStorageObject",
+        "summary": "Save a small app storage object",
+        "route_path": "apps/{app_id}/storage/save",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/storage/save",
+          "/{app}/v1/platform-admin/apps/{app_id}/storage/save",
+          "/platform-admin/apps/{app_id}/storage/save"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-blocks/app-blocks-platform.controller.ts"
+      }
+    ]
+  },
+  {
+    "module_name": "app-build-observability",
+    "module_label": "App Build Observability",
+    "module_summary": "覆盖 App Build Observability 相关的接口能力，可用于按模块检索当前 app 可接入的 API。",
+    "module_doc_path": "services/gateway/docs/modules/app-build-observability/README.md",
+    "route_count": 2,
+    "routes": [
+      {
+        "id": "app-build-observability:AppBuildObservabilityController:GET:apps/:app_id/build/events:events",
+        "controller_name": "AppBuildObservabilityController",
+        "controller_tag": "AppBuildObservability",
+        "method": "GET",
+        "handler": "events",
+        "summary": "Recent build/runtime events for one app",
+        "route_path": "apps/{app_id}/build/events",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/build/events",
+          "/{app}/v1/platform-admin/apps/{app_id}/build/events",
+          "/platform-admin/apps/{app_id}/build/events"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-build-observability/app-build-observability.controller.ts"
+      },
+      {
+        "id": "app-build-observability:AppBuildObservabilityController:GET:apps/:app_id/build/summary:summary",
+        "controller_name": "AppBuildObservabilityController",
+        "controller_tag": "AppBuildObservability",
+        "method": "GET",
+        "handler": "summary",
+        "summary": "Build resource summary for one app",
+        "route_path": "apps/{app_id}/build/summary",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/build/summary",
+          "/{app}/v1/platform-admin/apps/{app_id}/build/summary",
+          "/platform-admin/apps/{app_id}/build/summary"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-build-observability/app-build-observability.controller.ts"
+      }
+    ]
+  },
+  {
+    "module_name": "app-connectors",
+    "module_label": "App Connectors",
+    "module_summary": "覆盖 App Connectors 相关的接口能力，可用于按模块检索当前 app 可接入的 API。",
+    "module_doc_path": "services/gateway/docs/modules/app-connectors/README.md",
+    "route_count": 16,
+    "routes": [
+      {
+        "id": "app-connectors:AppConnectorsAppController:POST::connector/actions/:action/invoke:invokeAction",
+        "controller_name": "AppConnectorsAppController",
+        "controller_tag": "AppConnectors",
+        "method": "POST",
+        "handler": "invokeAction",
+        "summary": "Invoke an app connector action",
+        "route_path": "{connector}/actions/{action}/invoke",
+        "path_templates": [
+          "/{app}/v1/connectors/{connector}/actions/{action}/invoke",
+          "/api/v1/connectors/{connector}/actions/{action}/invoke",
+          "/connectors/{connector}/actions/{action}/invoke"
+        ],
+        "auth": "user",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-connectors/app-connectors-app.controller.ts"
+      },
+      {
+        "id": "app-connectors:AppConnectorsPlatformController:GET:apps/:app_id/connectors:listConnectors",
+        "controller_name": "AppConnectorsPlatformController",
+        "controller_tag": "AppConnectors",
+        "method": "GET",
+        "handler": "listConnectors",
+        "summary": "List app connectors",
+        "route_path": "apps/{app_id}/connectors",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/connectors",
+          "/{app}/v1/platform-admin/apps/{app_id}/connectors",
+          "/platform-admin/apps/{app_id}/connectors"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-connectors/app-connectors-platform.controller.ts"
+      },
+      {
+        "id": "app-connectors:AppConnectorsPlatformController:POST:apps/:app_id/connectors:createConnector",
+        "controller_name": "AppConnectorsPlatformController",
+        "controller_tag": "AppConnectors",
+        "method": "POST",
+        "handler": "createConnector",
+        "summary": "Create an app connector",
+        "route_path": "apps/{app_id}/connectors",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/connectors",
+          "/{app}/v1/platform-admin/apps/{app_id}/connectors",
+          "/platform-admin/apps/{app_id}/connectors"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-connectors/app-connectors-platform.controller.ts"
+      },
+      {
+        "id": "app-connectors:AppConnectorsPlatformController:DELETE:apps/:app_id/connectors/:connector:deleteConnector",
+        "controller_name": "AppConnectorsPlatformController",
+        "controller_tag": "AppConnectors",
+        "method": "DELETE",
+        "handler": "deleteConnector",
+        "summary": "Delete an app connector",
+        "route_path": "apps/{app_id}/connectors/{connector}",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/connectors/{connector}",
+          "/{app}/v1/platform-admin/apps/{app_id}/connectors/{connector}",
+          "/platform-admin/apps/{app_id}/connectors/{connector}"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-connectors/app-connectors-platform.controller.ts"
+      },
+      {
+        "id": "app-connectors:AppConnectorsPlatformController:PATCH:apps/:app_id/connectors/:connector:updateConnector",
+        "controller_name": "AppConnectorsPlatformController",
+        "controller_tag": "AppConnectors",
+        "method": "PATCH",
+        "handler": "updateConnector",
+        "summary": "Update an app connector",
+        "route_path": "apps/{app_id}/connectors/{connector}",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/connectors/{connector}",
+          "/{app}/v1/platform-admin/apps/{app_id}/connectors/{connector}",
+          "/platform-admin/apps/{app_id}/connectors/{connector}"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-connectors/app-connectors-platform.controller.ts"
+      },
+      {
+        "id": "app-connectors:AppConnectorsPlatformController:GET:apps/:app_id/connectors/:connector/actions:listActions",
+        "controller_name": "AppConnectorsPlatformController",
+        "controller_tag": "AppConnectors",
+        "method": "GET",
+        "handler": "listActions",
+        "summary": "List connector actions",
+        "route_path": "apps/{app_id}/connectors/{connector}/actions",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/connectors/{connector}/actions",
+          "/{app}/v1/platform-admin/apps/{app_id}/connectors/{connector}/actions",
+          "/platform-admin/apps/{app_id}/connectors/{connector}/actions"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-connectors/app-connectors-platform.controller.ts"
+      },
+      {
+        "id": "app-connectors:AppConnectorsPlatformController:POST:apps/:app_id/connectors/:connector/actions:createAction",
+        "controller_name": "AppConnectorsPlatformController",
+        "controller_tag": "AppConnectors",
+        "method": "POST",
+        "handler": "createAction",
+        "summary": "Create connector action",
+        "route_path": "apps/{app_id}/connectors/{connector}/actions",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/connectors/{connector}/actions",
+          "/{app}/v1/platform-admin/apps/{app_id}/connectors/{connector}/actions",
+          "/platform-admin/apps/{app_id}/connectors/{connector}/actions"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-connectors/app-connectors-platform.controller.ts"
+      },
+      {
+        "id": "app-connectors:AppConnectorsPlatformController:DELETE:apps/:app_id/connectors/:connector/actions/:action:deleteAction",
+        "controller_name": "AppConnectorsPlatformController",
+        "controller_tag": "AppConnectors",
+        "method": "DELETE",
+        "handler": "deleteAction",
+        "summary": "Delete connector action",
+        "route_path": "apps/{app_id}/connectors/{connector}/actions/{action}",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/connectors/{connector}/actions/{action}",
+          "/{app}/v1/platform-admin/apps/{app_id}/connectors/{connector}/actions/{action}",
+          "/platform-admin/apps/{app_id}/connectors/{connector}/actions/{action}"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-connectors/app-connectors-platform.controller.ts"
+      },
+      {
+        "id": "app-connectors:AppConnectorsPlatformController:PATCH:apps/:app_id/connectors/:connector/actions/:action:updateAction",
+        "controller_name": "AppConnectorsPlatformController",
+        "controller_tag": "AppConnectors",
+        "method": "PATCH",
+        "handler": "updateAction",
+        "summary": "Update connector action",
+        "route_path": "apps/{app_id}/connectors/{connector}/actions/{action}",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/connectors/{connector}/actions/{action}",
+          "/{app}/v1/platform-admin/apps/{app_id}/connectors/{connector}/actions/{action}",
+          "/platform-admin/apps/{app_id}/connectors/{connector}/actions/{action}"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-connectors/app-connectors-platform.controller.ts"
+      },
+      {
+        "id": "app-connectors:AppConnectorsPlatformController:POST:apps/:app_id/connectors/:connector/actions/:action/invoke:invokeAction",
+        "controller_name": "AppConnectorsPlatformController",
+        "controller_tag": "AppConnectors",
+        "method": "POST",
+        "handler": "invokeAction",
+        "summary": "Invoke connector action from platform admin",
+        "route_path": "apps/{app_id}/connectors/{connector}/actions/{action}/invoke",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/connectors/{connector}/actions/{action}/invoke",
+          "/{app}/v1/platform-admin/apps/{app_id}/connectors/{connector}/actions/{action}/invoke",
+          "/platform-admin/apps/{app_id}/connectors/{connector}/actions/{action}/invoke"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-connectors/app-connectors-platform.controller.ts"
+      },
+      {
+        "id": "app-connectors:AppConnectorsPlatformController:GET:apps/:app_id/connectors/:connector/actions/:action/runs:listActionRuns",
+        "controller_name": "AppConnectorsPlatformController",
+        "controller_tag": "AppConnectors",
+        "method": "GET",
+        "handler": "listActionRuns",
+        "summary": "List connector action runs",
+        "route_path": "apps/{app_id}/connectors/{connector}/actions/{action}/runs",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/connectors/{connector}/actions/{action}/runs",
+          "/{app}/v1/platform-admin/apps/{app_id}/connectors/{connector}/actions/{action}/runs",
+          "/platform-admin/apps/{app_id}/connectors/{connector}/actions/{action}/runs"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-connectors/app-connectors-platform.controller.ts"
+      },
+      {
+        "id": "app-connectors:AppConnectorsPlatformController:GET:apps/:app_id/connectors/:connector/credentials:listCredentials",
+        "controller_name": "AppConnectorsPlatformController",
+        "controller_tag": "AppConnectors",
+        "method": "GET",
+        "handler": "listCredentials",
+        "summary": "List connector credentials",
+        "route_path": "apps/{app_id}/connectors/{connector}/credentials",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/connectors/{connector}/credentials",
+          "/{app}/v1/platform-admin/apps/{app_id}/connectors/{connector}/credentials",
+          "/platform-admin/apps/{app_id}/connectors/{connector}/credentials"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-connectors/app-connectors-platform.controller.ts"
+      },
+      {
+        "id": "app-connectors:AppConnectorsPlatformController:POST:apps/:app_id/connectors/:connector/credentials:createCredential",
+        "controller_name": "AppConnectorsPlatformController",
+        "controller_tag": "AppConnectors",
+        "method": "POST",
+        "handler": "createCredential",
+        "summary": "Create connector credential",
+        "route_path": "apps/{app_id}/connectors/{connector}/credentials",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/connectors/{connector}/credentials",
+          "/{app}/v1/platform-admin/apps/{app_id}/connectors/{connector}/credentials",
+          "/platform-admin/apps/{app_id}/connectors/{connector}/credentials"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-connectors/app-connectors-platform.controller.ts"
+      },
+      {
+        "id": "app-connectors:AppConnectorsPlatformController:DELETE:apps/:app_id/connectors/:connector/credentials/:credential:deleteCredential",
+        "controller_name": "AppConnectorsPlatformController",
+        "controller_tag": "AppConnectors",
+        "method": "DELETE",
+        "handler": "deleteCredential",
+        "summary": "Delete connector credential",
+        "route_path": "apps/{app_id}/connectors/{connector}/credentials/{credential}",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/connectors/{connector}/credentials/{credential}",
+          "/{app}/v1/platform-admin/apps/{app_id}/connectors/{connector}/credentials/{credential}",
+          "/platform-admin/apps/{app_id}/connectors/{connector}/credentials/{credential}"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-connectors/app-connectors-platform.controller.ts"
+      },
+      {
+        "id": "app-connectors:AppConnectorsPlatformController:PATCH:apps/:app_id/connectors/:connector/credentials/:credential:updateCredential",
+        "controller_name": "AppConnectorsPlatformController",
+        "controller_tag": "AppConnectors",
+        "method": "PATCH",
+        "handler": "updateCredential",
+        "summary": "Update connector credential",
+        "route_path": "apps/{app_id}/connectors/{connector}/credentials/{credential}",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/connectors/{connector}/credentials/{credential}",
+          "/{app}/v1/platform-admin/apps/{app_id}/connectors/{connector}/credentials/{credential}",
+          "/platform-admin/apps/{app_id}/connectors/{connector}/credentials/{credential}"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-connectors/app-connectors-platform.controller.ts"
+      },
+      {
+        "id": "app-connectors:AppConnectorsPlatformController:GET:apps/:app_id/connectors/:connector/runs:listRuns",
+        "controller_name": "AppConnectorsPlatformController",
+        "controller_tag": "AppConnectors",
+        "method": "GET",
+        "handler": "listRuns",
+        "summary": "List connector runs",
+        "route_path": "apps/{app_id}/connectors/{connector}/runs",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/connectors/{connector}/runs",
+          "/{app}/v1/platform-admin/apps/{app_id}/connectors/{connector}/runs",
+          "/platform-admin/apps/{app_id}/connectors/{connector}/runs"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-connectors/app-connectors-platform.controller.ts"
+      }
+    ]
+  },
+  {
+    "module_name": "app-functions",
+    "module_label": "App Functions",
+    "module_summary": "覆盖 App Functions 相关的接口能力，可用于按模块检索当前 app 可接入的 API。",
+    "module_doc_path": "services/gateway/docs/modules/app-functions/README.md",
+    "route_count": 8,
+    "routes": [
+      {
+        "id": "app-functions:AppFunctionsAppController:POST::slug/invoke:invokeFunction",
+        "controller_name": "AppFunctionsAppController",
+        "controller_tag": "AppFunctions",
+        "method": "POST",
+        "handler": "invokeFunction",
+        "summary": "Invoke an app function",
+        "route_path": "{slug}/invoke",
+        "path_templates": [
+          "/{app}/v1/functions/{slug}/invoke",
+          "/api/v1/functions/{slug}/invoke",
+          "/functions/{slug}/invoke"
+        ],
+        "auth": "user",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-functions/app-functions-app.controller.ts"
+      },
+      {
+        "id": "app-functions:AppFunctionsPlatformController:GET:apps/:app_id/functions:listFunctions",
+        "controller_name": "AppFunctionsPlatformController",
+        "controller_tag": "AppFunctions",
+        "method": "GET",
+        "handler": "listFunctions",
+        "summary": "List app functions",
+        "route_path": "apps/{app_id}/functions",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/functions",
+          "/{app}/v1/platform-admin/apps/{app_id}/functions",
+          "/platform-admin/apps/{app_id}/functions"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-functions/app-functions-platform.controller.ts"
+      },
+      {
+        "id": "app-functions:AppFunctionsPlatformController:POST:apps/:app_id/functions:createFunction",
+        "controller_name": "AppFunctionsPlatformController",
+        "controller_tag": "AppFunctions",
+        "method": "POST",
+        "handler": "createFunction",
+        "summary": "Create an app function draft",
+        "route_path": "apps/{app_id}/functions",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/functions",
+          "/{app}/v1/platform-admin/apps/{app_id}/functions",
+          "/platform-admin/apps/{app_id}/functions"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-functions/app-functions-platform.controller.ts"
+      },
+      {
+        "id": "app-functions:AppFunctionsPlatformController:DELETE:apps/:app_id/functions/:function_id:deleteFunction",
+        "controller_name": "AppFunctionsPlatformController",
+        "controller_tag": "AppFunctions",
+        "method": "DELETE",
+        "handler": "deleteFunction",
+        "summary": "Delete an app function",
+        "route_path": "apps/{app_id}/functions/{function_id}",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/functions/{function_id}",
+          "/{app}/v1/platform-admin/apps/{app_id}/functions/{function_id}",
+          "/platform-admin/apps/{app_id}/functions/{function_id}"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-functions/app-functions-platform.controller.ts"
+      },
+      {
+        "id": "app-functions:AppFunctionsPlatformController:POST:apps/:app_id/functions/:function_id/deploy:deployFunction",
+        "controller_name": "AppFunctionsPlatformController",
+        "controller_tag": "AppFunctions",
+        "method": "POST",
+        "handler": "deployFunction",
+        "summary": "Deploy an app function version",
+        "route_path": "apps/{app_id}/functions/{function_id}/deploy",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/functions/{function_id}/deploy",
+          "/{app}/v1/platform-admin/apps/{app_id}/functions/{function_id}/deploy",
+          "/platform-admin/apps/{app_id}/functions/{function_id}/deploy"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-functions/app-functions-platform.controller.ts"
+      },
+      {
+        "id": "app-functions:AppFunctionsPlatformController:POST:apps/:app_id/functions/:function_id/invoke:invokeFromPlatform",
+        "controller_name": "AppFunctionsPlatformController",
+        "controller_tag": "AppFunctions",
+        "method": "POST",
+        "handler": "invokeFromPlatform",
+        "summary": "Invoke an app function from platform admin",
+        "route_path": "apps/{app_id}/functions/{function_id}/invoke",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/functions/{function_id}/invoke",
+          "/{app}/v1/platform-admin/apps/{app_id}/functions/{function_id}/invoke",
+          "/platform-admin/apps/{app_id}/functions/{function_id}/invoke"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-functions/app-functions-platform.controller.ts"
+      },
+      {
+        "id": "app-functions:AppFunctionsPlatformController:GET:apps/:app_id/functions/:function_id/runs:listRuns",
+        "controller_name": "AppFunctionsPlatformController",
+        "controller_tag": "AppFunctions",
+        "method": "GET",
+        "handler": "listRuns",
+        "summary": "List app function runs",
+        "route_path": "apps/{app_id}/functions/{function_id}/runs",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/functions/{function_id}/runs",
+          "/{app}/v1/platform-admin/apps/{app_id}/functions/{function_id}/runs",
+          "/platform-admin/apps/{app_id}/functions/{function_id}/runs"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-functions/app-functions-platform.controller.ts"
+      },
+      {
+        "id": "app-functions:AppFunctionsPlatformController:GET:functions/runtime/status:runtimeStatus",
+        "controller_name": "AppFunctionsPlatformController",
+        "controller_tag": "AppFunctions",
+        "method": "GET",
+        "handler": "runtimeStatus",
+        "summary": "Function runtime queue status",
+        "route_path": "functions/runtime/status",
+        "path_templates": [
+          "/api/v1/platform-admin/functions/runtime/status",
+          "/{app}/v1/platform-admin/functions/runtime/status",
+          "/platform-admin/functions/runtime/status"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-functions/app-functions-platform.controller.ts"
+      }
+    ]
+  },
+  {
+    "module_name": "app-runtime",
+    "module_label": "App Runtime",
+    "module_summary": "覆盖 App Runtime 相关的接口能力，可用于按模块检索当前 app 可接入的 API。",
+    "module_doc_path": "services/gateway/docs/modules/app-runtime/README.md",
+    "route_count": 6,
+    "routes": [
+      {
+        "id": "app-runtime:AppRuntimeController:GET:apps/:app_id/runtime/overview:appOverview",
+        "controller_name": "AppRuntimeController",
+        "controller_tag": "AppRuntime",
+        "method": "GET",
+        "handler": "appOverview",
+        "summary": "App runtime module overview",
+        "route_path": "apps/{app_id}/runtime/overview",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/runtime/overview",
+          "/{app}/v1/platform-admin/apps/{app_id}/runtime/overview",
+          "/platform-admin/apps/{app_id}/runtime/overview"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-runtime/app-runtime.controller.ts"
+      },
+      {
+        "id": "app-runtime:AppRuntimeController:POST:apps/:app_id/runtime/refresh:refreshApp",
+        "controller_name": "AppRuntimeController",
+        "controller_tag": "AppRuntime",
+        "method": "POST",
+        "handler": "refreshApp",
+        "summary": "Queue runtime module refresh for one app",
+        "route_path": "apps/{app_id}/runtime/refresh",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/runtime/refresh",
+          "/{app}/v1/platform-admin/apps/{app_id}/runtime/refresh",
+          "/platform-admin/apps/{app_id}/runtime/refresh"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-runtime/app-runtime.controller.ts"
+      },
+      {
+        "id": "app-runtime:AppRuntimeController:POST:apps/:app_id/runtime/templates/:template_key/apply:applyTemplate",
+        "controller_name": "AppRuntimeController",
+        "controller_tag": "AppRuntime",
+        "method": "POST",
+        "handler": "applyTemplate",
+        "summary": "Queue runtime template application for one app",
+        "route_path": "apps/{app_id}/runtime/templates/{template_key}/apply",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/runtime/templates/{template_key}/apply",
+          "/{app}/v1/platform-admin/apps/{app_id}/runtime/templates/{template_key}/apply",
+          "/platform-admin/apps/{app_id}/runtime/templates/{template_key}/apply"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-runtime/app-runtime.controller.ts"
+      },
+      {
+        "id": "app-runtime:AppRuntimeController:GET:runtime/overview:overview",
+        "controller_name": "AppRuntimeController",
+        "controller_tag": "AppRuntime",
+        "method": "GET",
+        "handler": "overview",
+        "summary": "Global app runtime module overview",
+        "route_path": "runtime/overview",
+        "path_templates": [
+          "/api/v1/platform-admin/runtime/overview",
+          "/{app}/v1/platform-admin/runtime/overview",
+          "/platform-admin/runtime/overview"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-runtime/app-runtime.controller.ts"
+      },
+      {
+        "id": "app-runtime:AppRuntimeController:POST:runtime/refresh:refreshAll",
+        "controller_name": "AppRuntimeController",
+        "controller_tag": "AppRuntime",
+        "method": "POST",
+        "handler": "refreshAll",
+        "summary": "Queue runtime module refresh for all apps",
+        "route_path": "runtime/refresh",
+        "path_templates": [
+          "/api/v1/platform-admin/runtime/refresh",
+          "/{app}/v1/platform-admin/runtime/refresh",
+          "/platform-admin/runtime/refresh"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-runtime/app-runtime.controller.ts"
+      },
+      {
+        "id": "app-runtime:AppRuntimeController:GET:runtime/templates:templates",
+        "controller_name": "AppRuntimeController",
+        "controller_tag": "AppRuntime",
+        "method": "GET",
+        "handler": "templates",
+        "summary": "List app runtime templates",
+        "route_path": "runtime/templates",
+        "path_templates": [
+          "/api/v1/platform-admin/runtime/templates",
+          "/{app}/v1/platform-admin/runtime/templates",
+          "/platform-admin/runtime/templates"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-runtime/app-runtime.controller.ts"
+      }
+    ]
+  },
+  {
+    "module_name": "app-schema",
+    "module_label": "App Schema",
+    "module_summary": "覆盖 App Schema 相关的接口能力，可用于按模块检索当前 app 可接入的 API。",
+    "module_doc_path": "services/gateway/docs/modules/app-schema/README.md",
+    "route_count": 11,
+    "routes": [
+      {
+        "id": "app-schema:AppDataController:GET::table:listRows",
+        "controller_name": "AppDataController",
+        "controller_tag": "AppData",
+        "method": "GET",
+        "handler": "listRows",
+        "summary": "查询 app 自定义数据表 rows",
+        "route_path": "{table}",
+        "path_templates": [
+          "/{app}/v1/data/{table}",
+          "/api/v1/data/{table}",
+          "/data/{table}"
+        ],
+        "auth": "user",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-schema/app-data.controller.ts"
+      },
+      {
+        "id": "app-schema:AppDataController:POST::table:createRow",
+        "controller_name": "AppDataController",
+        "controller_tag": "AppData",
+        "method": "POST",
+        "handler": "createRow",
+        "summary": "创建 app 自定义数据 row",
+        "route_path": "{table}",
+        "path_templates": [
+          "/{app}/v1/data/{table}",
+          "/api/v1/data/{table}",
+          "/data/{table}"
+        ],
+        "auth": "user",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-schema/app-data.controller.ts"
+      },
+      {
+        "id": "app-schema:AppDataController:DELETE::table/:id:deleteRow",
+        "controller_name": "AppDataController",
+        "controller_tag": "AppData",
+        "method": "DELETE",
+        "handler": "deleteRow",
+        "summary": "删除 app 自定义数据 row",
+        "route_path": "{table}/{id}",
+        "path_templates": [
+          "/{app}/v1/data/{table}/{id}",
+          "/api/v1/data/{table}/{id}",
+          "/data/{table}/{id}"
+        ],
+        "auth": "user",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-schema/app-data.controller.ts"
+      },
+      {
+        "id": "app-schema:AppDataController:GET::table/:id:getRow",
+        "controller_name": "AppDataController",
+        "controller_tag": "AppData",
+        "method": "GET",
+        "handler": "getRow",
+        "summary": "读取 app 自定义数据 row",
+        "route_path": "{table}/{id}",
+        "path_templates": [
+          "/{app}/v1/data/{table}/{id}",
+          "/api/v1/data/{table}/{id}",
+          "/data/{table}/{id}"
+        ],
+        "auth": "user",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-schema/app-data.controller.ts"
+      },
+      {
+        "id": "app-schema:AppDataController:PATCH::table/:id:updateRow",
+        "controller_name": "AppDataController",
+        "controller_tag": "AppData",
+        "method": "PATCH",
+        "handler": "updateRow",
+        "summary": "更新 app 自定义数据 row",
+        "route_path": "{table}/{id}",
+        "path_templates": [
+          "/{app}/v1/data/{table}/{id}",
+          "/api/v1/data/{table}/{id}",
+          "/data/{table}/{id}"
+        ],
+        "auth": "user",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-schema/app-data.controller.ts"
+      },
+      {
+        "id": "app-schema:AppDataController:GET:schema:getDataSchema",
+        "controller_name": "AppDataController",
+        "controller_tag": "AppData",
+        "method": "GET",
+        "handler": "getDataSchema",
+        "summary": "当前 app 自定义 Data API schema",
+        "route_path": "schema",
+        "path_templates": [
+          "/{app}/v1/data/schema",
+          "/api/v1/data/schema",
+          "/data/schema"
+        ],
+        "auth": "user",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-schema/app-data.controller.ts"
+      },
+      {
+        "id": "app-schema:AppSchemaPlatformController:GET:apps/:app_id/schema/manifest:getAppSchemaManifest",
+        "controller_name": "AppSchemaPlatformController",
+        "controller_tag": "AppSchema",
+        "method": "GET",
+        "handler": "getAppSchemaManifest",
+        "summary": "当前 app 自定义数据模型 manifest",
+        "route_path": "apps/{app_id}/schema/manifest",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/schema/manifest",
+          "/{app}/v1/platform-admin/apps/{app_id}/schema/manifest",
+          "/platform-admin/apps/{app_id}/schema/manifest"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-schema/app-schema-platform.controller.ts"
+      },
+      {
+        "id": "app-schema:AppSchemaPlatformController:POST:apps/:app_id/schema/tables:createAppDataTable",
+        "controller_name": "AppSchemaPlatformController",
+        "controller_tag": "AppSchema",
+        "method": "POST",
+        "handler": "createAppDataTable",
+        "summary": "结构化创建 app 数据表，默认 dry-run",
+        "route_path": "apps/{app_id}/schema/tables",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/schema/tables",
+          "/{app}/v1/platform-admin/apps/{app_id}/schema/tables",
+          "/platform-admin/apps/{app_id}/schema/tables"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-schema/app-schema-platform.controller.ts"
+      },
+      {
+        "id": "app-schema:AppSchemaPlatformController:DELETE:apps/:app_id/schema/tables/:table:dropAppDataTable",
+        "controller_name": "AppSchemaPlatformController",
+        "controller_tag": "AppSchema",
+        "method": "DELETE",
+        "handler": "dropAppDataTable",
+        "summary": "结构化删除 app 数据表，默认 dry-run",
+        "route_path": "apps/{app_id}/schema/tables/{table}",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/schema/tables/{table}",
+          "/{app}/v1/platform-admin/apps/{app_id}/schema/tables/{table}",
+          "/platform-admin/apps/{app_id}/schema/tables/{table}"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-schema/app-schema-platform.controller.ts"
+      },
+      {
+        "id": "app-schema:AppSchemaPlatformController:POST:apps/:app_id/schema/tables/:table/columns:addAppDataColumn",
+        "controller_name": "AppSchemaPlatformController",
+        "controller_tag": "AppSchema",
+        "method": "POST",
+        "handler": "addAppDataColumn",
+        "summary": "结构化添加 app 数据表字段，默认 dry-run",
+        "route_path": "apps/{app_id}/schema/tables/{table}/columns",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/schema/tables/{table}/columns",
+          "/{app}/v1/platform-admin/apps/{app_id}/schema/tables/{table}/columns",
+          "/platform-admin/apps/{app_id}/schema/tables/{table}/columns"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-schema/app-schema-platform.controller.ts"
+      },
+      {
+        "id": "app-schema:AppSchemaPlatformController:POST:apps/:app_id/schema/tables/:table/policies:upsertAppDataPolicy",
+        "controller_name": "AppSchemaPlatformController",
+        "controller_tag": "AppSchema",
+        "method": "POST",
+        "handler": "upsertAppDataPolicy",
+        "summary": "创建或更新 app 数据表访问策略",
+        "route_path": "apps/{app_id}/schema/tables/{table}/policies",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/schema/tables/{table}/policies",
+          "/{app}/v1/platform-admin/apps/{app_id}/schema/tables/{table}/policies",
+          "/platform-admin/apps/{app_id}/schema/tables/{table}/policies"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-schema/app-schema-platform.controller.ts"
+      }
+    ]
+  },
+  {
+    "module_name": "app-workflows",
+    "module_label": "App Workflows",
+    "module_summary": "覆盖 App Workflows 相关的接口能力，可用于按模块检索当前 app 可接入的 API。",
+    "module_doc_path": "services/gateway/docs/modules/app-workflows/README.md",
+    "route_count": 7,
+    "routes": [
+      {
+        "id": "app-workflows:AppWorkflowsAppController:POST::slug/run:runWorkflow",
+        "controller_name": "AppWorkflowsAppController",
+        "controller_tag": "AppWorkflows",
+        "method": "POST",
+        "handler": "runWorkflow",
+        "summary": "Run an app workflow",
+        "route_path": "{slug}/run",
+        "path_templates": [
+          "/{app}/v1/workflows/{slug}/run",
+          "/api/v1/workflows/{slug}/run",
+          "/workflows/{slug}/run"
+        ],
+        "auth": "user",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-workflows/app-workflows-app.controller.ts"
+      },
+      {
+        "id": "app-workflows:AppWorkflowsPlatformController:GET:apps/:app_id/workflows:listWorkflows",
+        "controller_name": "AppWorkflowsPlatformController",
+        "controller_tag": "AppWorkflows",
+        "method": "GET",
+        "handler": "listWorkflows",
+        "summary": "List app workflows",
+        "route_path": "apps/{app_id}/workflows",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/workflows",
+          "/{app}/v1/platform-admin/apps/{app_id}/workflows",
+          "/platform-admin/apps/{app_id}/workflows"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-workflows/app-workflows-platform.controller.ts"
+      },
+      {
+        "id": "app-workflows:AppWorkflowsPlatformController:POST:apps/:app_id/workflows:createWorkflow",
+        "controller_name": "AppWorkflowsPlatformController",
+        "controller_tag": "AppWorkflows",
+        "method": "POST",
+        "handler": "createWorkflow",
+        "summary": "Create an app workflow",
+        "route_path": "apps/{app_id}/workflows",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/workflows",
+          "/{app}/v1/platform-admin/apps/{app_id}/workflows",
+          "/platform-admin/apps/{app_id}/workflows"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-workflows/app-workflows-platform.controller.ts"
+      },
+      {
+        "id": "app-workflows:AppWorkflowsPlatformController:DELETE:apps/:app_id/workflows/:workflow_id:deleteWorkflow",
+        "controller_name": "AppWorkflowsPlatformController",
+        "controller_tag": "AppWorkflows",
+        "method": "DELETE",
+        "handler": "deleteWorkflow",
+        "summary": "Delete an app workflow",
+        "route_path": "apps/{app_id}/workflows/{workflow_id}",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/workflows/{workflow_id}",
+          "/{app}/v1/platform-admin/apps/{app_id}/workflows/{workflow_id}",
+          "/platform-admin/apps/{app_id}/workflows/{workflow_id}"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-workflows/app-workflows-platform.controller.ts"
+      },
+      {
+        "id": "app-workflows:AppWorkflowsPlatformController:POST:apps/:app_id/workflows/:workflow_id/run:runWorkflow",
+        "controller_name": "AppWorkflowsPlatformController",
+        "controller_tag": "AppWorkflows",
+        "method": "POST",
+        "handler": "runWorkflow",
+        "summary": "Run an app workflow from platform admin",
+        "route_path": "apps/{app_id}/workflows/{workflow_id}/run",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/workflows/{workflow_id}/run",
+          "/{app}/v1/platform-admin/apps/{app_id}/workflows/{workflow_id}/run",
+          "/platform-admin/apps/{app_id}/workflows/{workflow_id}/run"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/app-workflows/app-workflows-platform.controller.ts"
+      },
+      {
+        "id": "app-workflows:AppWorkflowsPlatformController:GET:apps/:app_id/workflows/:workflow_id/runs:listRuns",
+        "controller_name": "AppWorkflowsPlatformController",
+        "controller_tag": "AppWorkflows",
+        "method": "GET",
+        "handler": "listRuns",
+        "summary": "List app workflow runs",
+        "route_path": "apps/{app_id}/workflows/{workflow_id}/runs",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/workflows/{workflow_id}/runs",
+          "/{app}/v1/platform-admin/apps/{app_id}/workflows/{workflow_id}/runs",
+          "/platform-admin/apps/{app_id}/workflows/{workflow_id}/runs"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-workflows/app-workflows-platform.controller.ts"
+      },
+      {
+        "id": "app-workflows:AppWorkflowsPlatformController:GET:workflows/runtime/status:runtimeStatus",
+        "controller_name": "AppWorkflowsPlatformController",
+        "controller_tag": "AppWorkflows",
+        "method": "GET",
+        "handler": "runtimeStatus",
+        "summary": "Workflow runtime queue status",
+        "route_path": "workflows/runtime/status",
+        "path_templates": [
+          "/api/v1/platform-admin/workflows/runtime/status",
+          "/{app}/v1/platform-admin/workflows/runtime/status",
+          "/platform-admin/workflows/runtime/status"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/app-workflows/app-workflows-platform.controller.ts"
+      }
+    ]
+  },
+  {
     "module_name": "auth",
     "module_label": "认证与登录",
     "module_summary": "覆盖 认证与登录 相关的接口能力，可用于按模块检索当前 app 可接入的 API。",
@@ -2475,6 +3638,344 @@ export const GENERATED_API_DOC_MODULES: GeneratedApiDocModule[] = [
         "consumes": "application/json",
         "has_body": true,
         "source_file": "services/gateway/src/modules/auth/auth.controller.ts"
+      }
+    ]
+  },
+  {
+    "module_name": "bootstrap",
+    "module_label": "Bootstrap",
+    "module_summary": "覆盖 Bootstrap 相关的接口能力，可用于按模块检索当前 app 可接入的 API。",
+    "module_doc_path": "services/gateway/docs/modules/bootstrap/README.md",
+    "route_count": 2,
+    "routes": [
+      {
+        "id": "bootstrap:BootstrapController:POST:platform-admin:createPlatformAdmin",
+        "controller_name": "BootstrapController",
+        "controller_tag": "Bootstrap",
+        "method": "POST",
+        "handler": "createPlatformAdmin",
+        "summary": "创建首个平台超级管理员",
+        "route_path": "platform-admin",
+        "path_templates": [
+          "/{app}/v1/bootstrap/platform-admin",
+          "/api/v1/bootstrap/platform-admin",
+          "/bootstrap/platform-admin"
+        ],
+        "auth": "unknown",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/bootstrap/bootstrap.controller.ts"
+      },
+      {
+        "id": "bootstrap:BootstrapController:GET:status:getStatus",
+        "controller_name": "BootstrapController",
+        "controller_tag": "Bootstrap",
+        "method": "GET",
+        "handler": "getStatus",
+        "summary": "检查首次启动初始化状态",
+        "route_path": "status",
+        "path_templates": [
+          "/{app}/v1/bootstrap/status",
+          "/api/v1/bootstrap/status",
+          "/bootstrap/status"
+        ],
+        "auth": "unknown",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/bootstrap/bootstrap.controller.ts"
+      }
+    ]
+  },
+  {
+    "module_name": "developer-sdk",
+    "module_label": "Developer Sdk",
+    "module_summary": "覆盖 Developer Sdk 相关的接口能力，可用于按模块检索当前 app 可接入的 API。",
+    "module_doc_path": "services/gateway/docs/modules/developer-sdk/README.md",
+    "route_count": 14,
+    "routes": [
+      {
+        "id": "developer-sdk:DeveloperSdkController:POST:auth/sessions:createLoginSession",
+        "controller_name": "DeveloperSdkController",
+        "controller_tag": "DeveloperSDK",
+        "method": "POST",
+        "handler": "createLoginSession",
+        "summary": "Create a browser-based SDK login session for local CLI clients",
+        "route_path": "auth/sessions",
+        "path_templates": [
+          "/{app}/v1/sdk/auth/sessions",
+          "/api/v1/sdk/auth/sessions",
+          "/sdk/auth/sessions"
+        ],
+        "auth": "unknown",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/developer-sdk/developer-sdk.controller.ts"
+      },
+      {
+        "id": "developer-sdk:DeveloperSdkController:GET:auth/sessions/:state:getLoginSession",
+        "controller_name": "DeveloperSdkController",
+        "controller_tag": "DeveloperSDK",
+        "method": "GET",
+        "handler": "getLoginSession",
+        "summary": "Read a browser-based SDK login session",
+        "route_path": "auth/sessions/{state}",
+        "path_templates": [
+          "/{app}/v1/sdk/auth/sessions/{state}",
+          "/api/v1/sdk/auth/sessions/{state}",
+          "/sdk/auth/sessions/{state}"
+        ],
+        "auth": "unknown",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/developer-sdk/developer-sdk.controller.ts"
+      },
+      {
+        "id": "developer-sdk:DeveloperSdkController:POST:auth/sessions/:state/authorize:authorizeLoginSession",
+        "controller_name": "DeveloperSdkController",
+        "controller_tag": "DeveloperSDK",
+        "method": "POST",
+        "handler": "authorizeLoginSession",
+        "summary": "Authorize an SDK login session with the current app admin",
+        "route_path": "auth/sessions/{state}/authorize",
+        "path_templates": [
+          "/{app}/v1/sdk/auth/sessions/{state}/authorize",
+          "/api/v1/sdk/auth/sessions/{state}/authorize",
+          "/sdk/auth/sessions/{state}/authorize"
+        ],
+        "auth": "user",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/developer-sdk/developer-sdk.controller.ts"
+      },
+      {
+        "id": "developer-sdk:DeveloperSdkController:POST:auth/token:exchangeLoginToken",
+        "controller_name": "DeveloperSdkController",
+        "controller_tag": "DeveloperSDK",
+        "method": "POST",
+        "handler": "exchangeLoginToken",
+        "summary": "Exchange a browser authorization code for a local SDK API key",
+        "route_path": "auth/token",
+        "path_templates": [
+          "/{app}/v1/sdk/auth/token",
+          "/api/v1/sdk/auth/token",
+          "/sdk/auth/token"
+        ],
+        "auth": "unknown",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/developer-sdk/developer-sdk.controller.ts"
+      },
+      {
+        "id": "developer-sdk:DeveloperSdkController:POST:database/execute:databaseExecute",
+        "controller_name": "DeveloperSdkController",
+        "controller_tag": "DeveloperSDK",
+        "method": "POST",
+        "handler": "databaseExecute",
+        "summary": "Dry-run or apply SQL changes inside the app-owned database namespace",
+        "route_path": "database/execute",
+        "path_templates": [
+          "/{app}/v1/sdk/database/execute",
+          "/api/v1/sdk/database/execute",
+          "/sdk/database/execute"
+        ],
+        "auth": "user",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/developer-sdk/developer-sdk.controller.ts"
+      },
+      {
+        "id": "developer-sdk:DeveloperSdkController:GET:database/manifest:databaseManifest",
+        "controller_name": "DeveloperSdkController",
+        "controller_tag": "DeveloperSDK",
+        "method": "GET",
+        "handler": "databaseManifest",
+        "summary": "Return app-scoped database namespace and safety contract",
+        "route_path": "database/manifest",
+        "path_templates": [
+          "/{app}/v1/sdk/database/manifest",
+          "/api/v1/sdk/database/manifest",
+          "/sdk/database/manifest"
+        ],
+        "auth": "user",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/developer-sdk/developer-sdk.controller.ts"
+      },
+      {
+        "id": "developer-sdk:DeveloperSdkController:POST:database/query:databaseQuery",
+        "controller_name": "DeveloperSdkController",
+        "controller_tag": "DeveloperSDK",
+        "method": "POST",
+        "handler": "databaseQuery",
+        "summary": "Run a read-only SQL query against app-owned database tables",
+        "route_path": "database/query",
+        "path_templates": [
+          "/{app}/v1/sdk/database/query",
+          "/api/v1/sdk/database/query",
+          "/sdk/database/query"
+        ],
+        "auth": "user",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/developer-sdk/developer-sdk.controller.ts"
+      },
+      {
+        "id": "developer-sdk:DeveloperSdkController:GET:database/tables:databaseTables",
+        "controller_name": "DeveloperSdkController",
+        "controller_tag": "DeveloperSDK",
+        "method": "GET",
+        "handler": "databaseTables",
+        "summary": "List app-owned database tables visible to the SDK",
+        "route_path": "database/tables",
+        "path_templates": [
+          "/{app}/v1/sdk/database/tables",
+          "/api/v1/sdk/database/tables",
+          "/sdk/database/tables"
+        ],
+        "auth": "user",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/developer-sdk/developer-sdk.controller.ts"
+      },
+      {
+        "id": "developer-sdk:DeveloperSdkController:GET:database/tables/:table:databaseTable",
+        "controller_name": "DeveloperSdkController",
+        "controller_tag": "DeveloperSDK",
+        "method": "GET",
+        "handler": "databaseTable",
+        "summary": "Describe an app-owned database table",
+        "route_path": "database/tables/{table}",
+        "path_templates": [
+          "/{app}/v1/sdk/database/tables/{table}",
+          "/api/v1/sdk/database/tables/{table}",
+          "/sdk/database/tables/{table}"
+        ],
+        "auth": "user",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/developer-sdk/developer-sdk.controller.ts"
+      },
+      {
+        "id": "developer-sdk:DeveloperSdkController:GET:examples:getExamples",
+        "controller_name": "DeveloperSdkController",
+        "controller_tag": "DeveloperSDK",
+        "method": "GET",
+        "handler": "getExamples",
+        "summary": "OPG SDK usage examples",
+        "route_path": "examples",
+        "path_templates": [
+          "/{app}/v1/sdk/examples",
+          "/api/v1/sdk/examples",
+          "/sdk/examples"
+        ],
+        "auth": "unknown",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/developer-sdk/developer-sdk.controller.ts"
+      },
+      {
+        "id": "developer-sdk:DeveloperSdkController:POST:install-profile:installProfile",
+        "controller_name": "DeveloperSdkController",
+        "controller_tag": "DeveloperSDK",
+        "method": "POST",
+        "handler": "installProfile",
+        "summary": "Return a local SDK install profile for Codex or CLI clients",
+        "route_path": "install-profile",
+        "path_templates": [
+          "/{app}/v1/sdk/install-profile",
+          "/api/v1/sdk/install-profile",
+          "/sdk/install-profile"
+        ],
+        "auth": "user",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/developer-sdk/developer-sdk.controller.ts"
+      },
+      {
+        "id": "developer-sdk:DeveloperSdkController:GET:manifest:getManifest",
+        "controller_name": "DeveloperSdkController",
+        "controller_tag": "DeveloperSDK",
+        "method": "GET",
+        "handler": "getManifest",
+        "summary": "OPG SDK manifest for the current app",
+        "route_path": "manifest",
+        "path_templates": [
+          "/{app}/v1/sdk/manifest",
+          "/api/v1/sdk/manifest",
+          "/sdk/manifest"
+        ],
+        "auth": "unknown",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/developer-sdk/developer-sdk.controller.ts"
+      },
+      {
+        "id": "developer-sdk:DeveloperSdkController:GET:openapi.json:getOpenApi",
+        "controller_name": "DeveloperSdkController",
+        "controller_tag": "DeveloperSDK",
+        "method": "GET",
+        "handler": "getOpenApi",
+        "summary": "OPG SDK OpenAPI contract for the current app",
+        "route_path": "openapi.json",
+        "path_templates": [
+          "/{app}/v1/sdk/openapi.json",
+          "/api/v1/sdk/openapi.json",
+          "/sdk/openapi.json"
+        ],
+        "auth": "unknown",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/developer-sdk/developer-sdk.controller.ts"
+      },
+      {
+        "id": "developer-sdk:DeveloperSdkController:POST:smoke-test:smokeTest",
+        "controller_name": "DeveloperSdkController",
+        "controller_tag": "DeveloperSDK",
+        "method": "POST",
+        "handler": "smokeTest",
+        "summary": "Validate SDK authentication and route contract",
+        "route_path": "smoke-test",
+        "path_templates": [
+          "/{app}/v1/sdk/smoke-test",
+          "/api/v1/sdk/smoke-test",
+          "/sdk/smoke-test"
+        ],
+        "auth": "user",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/developer-sdk/developer-sdk.controller.ts"
       }
     ]
   },
@@ -3248,8 +4749,68 @@ export const GENERATED_API_DOC_MODULES: GeneratedApiDocModule[] = [
     "module_label": "平台租户管理",
     "module_summary": "覆盖 平台租户管理 相关的接口能力，可用于按模块检索当前 app 可接入的 API。",
     "module_doc_path": "services/gateway/docs/modules/platform-admin/README.md",
-    "route_count": 172,
+    "route_count": 221,
     "routes": [
+      {
+        "id": "platform-admin:PlatformAdminController:GET:ai/audit-events:listAiAuditEvents",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listAiAuditEvents",
+        "summary": "AI 配置审计事件",
+        "route_path": "ai/audit-events",
+        "path_templates": [
+          "/api/v1/platform-admin/ai/audit-events",
+          "/{app}/v1/platform-admin/ai/audit-events",
+          "/platform-admin/ai/audit-events"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:ai/gateway/provider-health:listAiGatewayProviderHealth",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listAiGatewayProviderHealth",
+        "summary": "AI 网关供应商健康状态",
+        "route_path": "ai/gateway/provider-health",
+        "path_templates": [
+          "/api/v1/platform-admin/ai/gateway/provider-health",
+          "/{app}/v1/platform-admin/ai/gateway/provider-health",
+          "/platform-admin/ai/gateway/provider-health"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:ai/gateway/request-events:listAiGatewayRequestEvents",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listAiGatewayRequestEvents",
+        "summary": "AI 网关请求事件",
+        "route_path": "ai/gateway/request-events",
+        "path_templates": [
+          "/api/v1/platform-admin/ai/gateway/request-events",
+          "/{app}/v1/platform-admin/ai/gateway/request-events",
+          "/platform-admin/ai/gateway/request-events"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
       {
         "id": "platform-admin:PlatformAdminController:GET:ai/gateway/runtime:getAiGatewayRuntimeStats",
         "controller_name": "PlatformAdminController",
@@ -4151,6 +5712,26 @@ export const GENERATED_API_DOC_MODULES: GeneratedApiDocModule[] = [
         "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
       },
       {
+        "id": "platform-admin:PlatformAdminController:PUT:apps/:app_id/ai/model-visibility/:model_id:updateAppAiModelVisibility",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "PUT",
+        "handler": "updateAppAiModelVisibility",
+        "summary": "设置租户模型展示状态",
+        "route_path": "apps/{app_id}/ai/model-visibility/{model_id}",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/ai/model-visibility/{model_id}",
+          "/{app}/v1/platform-admin/apps/{app_id}/ai/model-visibility/{model_id}",
+          "/platform-admin/apps/{app_id}/ai/model-visibility/{model_id}"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
         "id": "platform-admin:PlatformAdminController:GET:apps/:app_id/ai/points-settings:getAppAiPointsSettings",
         "controller_name": "PlatformAdminController",
         "controller_tag": "PlatformAdmin",
@@ -4791,6 +6372,46 @@ export const GENERATED_API_DOC_MODULES: GeneratedApiDocModule[] = [
         "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
       },
       {
+        "id": "platform-admin:PlatformAdminController:GET:apps/:app_id/observability/audit-events:listAppPlatformAuditEvents",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listAppPlatformAuditEvents",
+        "summary": "租户审计事件",
+        "route_path": "apps/{app_id}/observability/audit-events",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/observability/audit-events",
+          "/{app}/v1/platform-admin/apps/{app_id}/observability/audit-events",
+          "/platform-admin/apps/{app_id}/observability/audit-events"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:apps/:app_id/observability/request-events:listAppPlatformRequestEvents",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listAppPlatformRequestEvents",
+        "summary": "租户请求事件",
+        "route_path": "apps/{app_id}/observability/request-events",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/observability/request-events",
+          "/{app}/v1/platform-admin/apps/{app_id}/observability/request-events",
+          "/platform-admin/apps/{app_id}/observability/request-events"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
         "id": "platform-admin:PlatformAdminController:GET:apps/:app_id/payments/orders:listAppPaymentOrders",
         "controller_name": "PlatformAdminController",
         "controller_tag": "PlatformAdmin",
@@ -5251,6 +6872,46 @@ export const GENERATED_API_DOC_MODULES: GeneratedApiDocModule[] = [
         "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
       },
       {
+        "id": "platform-admin:PlatformAdminController:GET:apps/:app_id/tasks:listAppPlatformTasks",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listAppPlatformTasks",
+        "summary": "租户平台任务列表",
+        "route_path": "apps/{app_id}/tasks",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/tasks",
+          "/{app}/v1/platform-admin/apps/{app_id}/tasks",
+          "/platform-admin/apps/{app_id}/tasks"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:apps/:app_id/tasks/:task_id:getAppPlatformTask",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "getAppPlatformTask",
+        "summary": "租户平台任务详情",
+        "route_path": "apps/{app_id}/tasks/{task_id}",
+        "path_templates": [
+          "/api/v1/platform-admin/apps/{app_id}/tasks/{task_id}",
+          "/{app}/v1/platform-admin/apps/{app_id}/tasks/{task_id}",
+          "/platform-admin/apps/{app_id}/tasks/{task_id}"
+        ],
+        "auth": "admin",
+        "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
         "id": "platform-admin:PlatformAdminController:POST:apps/:app_id/users/:user_id/deactivate:deactivateTenantUser",
         "controller_name": "PlatformAdminController",
         "controller_tag": "PlatformAdmin",
@@ -5325,6 +6986,86 @@ export const GENERATED_API_DOC_MODULES: GeneratedApiDocModule[] = [
         ],
         "auth": "admin",
         "scope": "platform-app",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:developer-authorizations/grants:listDeveloperAuthorizationGrants",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listDeveloperAuthorizationGrants",
+        "summary": "开发者授权列表",
+        "route_path": "developer-authorizations/grants",
+        "path_templates": [
+          "/api/v1/platform-admin/developer-authorizations/grants",
+          "/{app}/v1/platform-admin/developer-authorizations/grants",
+          "/platform-admin/developer-authorizations/grants"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:PATCH:developer-authorizations/grants/:grant_id:updateDeveloperAuthorizationGrant",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "PATCH",
+        "handler": "updateDeveloperAuthorizationGrant",
+        "summary": "更新开发者授权范围",
+        "route_path": "developer-authorizations/grants/{grant_id}",
+        "path_templates": [
+          "/api/v1/platform-admin/developer-authorizations/grants/{grant_id}",
+          "/{app}/v1/platform-admin/developer-authorizations/grants/{grant_id}",
+          "/platform-admin/developer-authorizations/grants/{grant_id}"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:POST:developer-authorizations/grants/:grant_id/revoke:revokeDeveloperAuthorizationGrant",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "POST",
+        "handler": "revokeDeveloperAuthorizationGrant",
+        "summary": "撤销开发者授权",
+        "route_path": "developer-authorizations/grants/{grant_id}/revoke",
+        "path_templates": [
+          "/api/v1/platform-admin/developer-authorizations/grants/{grant_id}/revoke",
+          "/{app}/v1/platform-admin/developer-authorizations/grants/{grant_id}/revoke",
+          "/platform-admin/developer-authorizations/grants/{grant_id}/revoke"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:developer-authorizations/scopes:listDeveloperAuthorizationScopes",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listDeveloperAuthorizationScopes",
+        "summary": "开发者授权 scope 目录",
+        "route_path": "developer-authorizations/scopes",
+        "path_templates": [
+          "/api/v1/platform-admin/developer-authorizations/scopes",
+          "/{app}/v1/platform-admin/developer-authorizations/scopes",
+          "/platform-admin/developer-authorizations/scopes"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
         "supports_app_query": false,
         "consumes": null,
         "has_body": false,
@@ -5468,6 +7209,146 @@ export const GENERATED_API_DOC_MODULES: GeneratedApiDocModule[] = [
         "supports_app_query": false,
         "consumes": "application/json",
         "has_body": true,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:email/providers:listEmailProviders",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listEmailProviders",
+        "summary": "邮件供应商列表",
+        "route_path": "email/providers",
+        "path_templates": [
+          "/api/v1/platform-admin/email/providers",
+          "/{app}/v1/platform-admin/email/providers",
+          "/platform-admin/email/providers"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:POST:email/providers:createEmailProvider",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "POST",
+        "handler": "createEmailProvider",
+        "summary": "创建邮件供应商",
+        "route_path": "email/providers",
+        "path_templates": [
+          "/api/v1/platform-admin/email/providers",
+          "/{app}/v1/platform-admin/email/providers",
+          "/platform-admin/email/providers"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:DELETE:email/providers/:provider_id:deleteEmailProvider",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "DELETE",
+        "handler": "deleteEmailProvider",
+        "summary": "删除邮件供应商",
+        "route_path": "email/providers/{provider_id}",
+        "path_templates": [
+          "/api/v1/platform-admin/email/providers/{provider_id}",
+          "/{app}/v1/platform-admin/email/providers/{provider_id}",
+          "/platform-admin/email/providers/{provider_id}"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:PATCH:email/providers/:provider_id:updateEmailProvider",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "PATCH",
+        "handler": "updateEmailProvider",
+        "summary": "更新邮件供应商",
+        "route_path": "email/providers/{provider_id}",
+        "path_templates": [
+          "/api/v1/platform-admin/email/providers/{provider_id}",
+          "/{app}/v1/platform-admin/email/providers/{provider_id}",
+          "/platform-admin/email/providers/{provider_id}"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:email/providers/:provider_id/sending-domains:listEmailProviderSendingDomains",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listEmailProviderSendingDomains",
+        "summary": "邮件供应商发送域名列表",
+        "route_path": "email/providers/{provider_id}/sending-domains",
+        "path_templates": [
+          "/api/v1/platform-admin/email/providers/{provider_id}/sending-domains",
+          "/{app}/v1/platform-admin/email/providers/{provider_id}/sending-domains",
+          "/platform-admin/email/providers/{provider_id}/sending-domains"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:POST:email/providers/:provider_id/test:testEmailProvider",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "POST",
+        "handler": "testEmailProvider",
+        "summary": "测试邮件供应商",
+        "route_path": "email/providers/{provider_id}/test",
+        "path_templates": [
+          "/api/v1/platform-admin/email/providers/{provider_id}/test",
+          "/{app}/v1/platform-admin/email/providers/{provider_id}/test",
+          "/platform-admin/email/providers/{provider_id}/test"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:email/providers/catalog:listEmailProviderCatalog",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listEmailProviderCatalog",
+        "summary": "邮件供应商类型",
+        "route_path": "email/providers/catalog",
+        "path_templates": [
+          "/api/v1/platform-admin/email/providers/catalog",
+          "/{app}/v1/platform-admin/email/providers/catalog",
+          "/platform-admin/email/providers/catalog"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
         "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
       },
       {
@@ -5857,6 +7738,126 @@ export const GENERATED_API_DOC_MODULES: GeneratedApiDocModule[] = [
           "/api/v1/platform-admin/google/oauth-clients/{client_id}/test",
           "/{app}/v1/platform-admin/google/oauth-clients/{client_id}/test",
           "/platform-admin/google/oauth-clients/{client_id}/test"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:integration-api-keys:listPlatformApiKeys",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listPlatformApiKeys",
+        "summary": "平台集成 API Key 列表",
+        "route_path": "integration-api-keys",
+        "path_templates": [
+          "/api/v1/platform-admin/integration-api-keys",
+          "/{app}/v1/platform-admin/integration-api-keys",
+          "/platform-admin/integration-api-keys"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:POST:integration-api-keys:createPlatformApiKey",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "POST",
+        "handler": "createPlatformApiKey",
+        "summary": "创建平台集成 API Key",
+        "route_path": "integration-api-keys",
+        "path_templates": [
+          "/api/v1/platform-admin/integration-api-keys",
+          "/{app}/v1/platform-admin/integration-api-keys",
+          "/platform-admin/integration-api-keys"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:POST:integration-api-keys/:api_key_id/revoke:revokePlatformApiKey",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "POST",
+        "handler": "revokePlatformApiKey",
+        "summary": "撤销平台集成 API Key",
+        "route_path": "integration-api-keys/{api_key_id}/revoke",
+        "path_templates": [
+          "/api/v1/platform-admin/integration-api-keys/{api_key_id}/revoke",
+          "/{app}/v1/platform-admin/integration-api-keys/{api_key_id}/revoke",
+          "/platform-admin/integration-api-keys/{api_key_id}/revoke"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:observability/audit-events:listPlatformAuditEvents",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listPlatformAuditEvents",
+        "summary": "平台审计事件",
+        "route_path": "observability/audit-events",
+        "path_templates": [
+          "/api/v1/platform-admin/observability/audit-events",
+          "/{app}/v1/platform-admin/observability/audit-events",
+          "/platform-admin/observability/audit-events"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:observability/request-events:listPlatformRequestEvents",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listPlatformRequestEvents",
+        "summary": "平台请求事件",
+        "route_path": "observability/request-events",
+        "path_templates": [
+          "/api/v1/platform-admin/observability/request-events",
+          "/{app}/v1/platform-admin/observability/request-events",
+          "/platform-admin/observability/request-events"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:observability/runtime:getPlatformObservabilityRuntime",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "getPlatformObservabilityRuntime",
+        "summary": "平台运行观测摘要",
+        "route_path": "observability/runtime",
+        "path_templates": [
+          "/api/v1/platform-admin/observability/runtime",
+          "/{app}/v1/platform-admin/observability/runtime",
+          "/platform-admin/observability/runtime"
         ],
         "auth": "admin",
         "scope": "platform-global",
@@ -6326,12 +8327,92 @@ export const GENERATED_API_DOC_MODULES: GeneratedApiDocModule[] = [
         "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
       },
       {
+        "id": "platform-admin:PlatformAdminController:GET:runtime-settings:getRuntimeSettings",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "getRuntimeSettings",
+        "summary": "平台运行时设置",
+        "route_path": "runtime-settings",
+        "path_templates": [
+          "/api/v1/platform-admin/runtime-settings",
+          "/{app}/v1/platform-admin/runtime-settings",
+          "/platform-admin/runtime-settings"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:PATCH:runtime-settings:updateRuntimeSettings",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "PATCH",
+        "handler": "updateRuntimeSettings",
+        "summary": "更新平台运行时设置",
+        "route_path": "runtime-settings",
+        "path_templates": [
+          "/api/v1/platform-admin/runtime-settings",
+          "/{app}/v1/platform-admin/runtime-settings",
+          "/platform-admin/runtime-settings"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:sms/events:listSmsMessageEvents",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listSmsMessageEvents",
+        "summary": "平台短信发送与配置审计事件",
+        "route_path": "sms/events",
+        "path_templates": [
+          "/api/v1/platform-admin/sms/events",
+          "/{app}/v1/platform-admin/sms/events",
+          "/platform-admin/sms/events"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:sms/provider-catalog:listSmsProviderCatalog",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listSmsProviderCatalog",
+        "summary": "平台短信供应商类型目录",
+        "route_path": "sms/provider-catalog",
+        "path_templates": [
+          "/api/v1/platform-admin/sms/provider-catalog",
+          "/{app}/v1/platform-admin/sms/provider-catalog",
+          "/platform-admin/sms/provider-catalog"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
         "id": "platform-admin:PlatformAdminController:GET:sms/providers:listGlobalSmsProviders",
         "controller_name": "PlatformAdminController",
         "controller_tag": "PlatformAdmin",
         "method": "GET",
         "handler": "listGlobalSmsProviders",
-        "summary": "平台短信服务配置列表（通用API/阿里云）",
+        "summary": "平台短信服务配置列表",
         "route_path": "sms/providers",
         "path_templates": [
           "/api/v1/platform-admin/sms/providers",
@@ -6506,6 +8587,26 @@ export const GENERATED_API_DOC_MODULES: GeneratedApiDocModule[] = [
         "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
       },
       {
+        "id": "platform-admin:PlatformAdminController:GET:sms/summary:getSmsObservabilitySummary",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "getSmsObservabilitySummary",
+        "summary": "平台短信可观测汇总",
+        "route_path": "sms/summary",
+        "path_templates": [
+          "/api/v1/platform-admin/sms/summary",
+          "/{app}/v1/platform-admin/sms/summary",
+          "/platform-admin/sms/summary"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
         "id": "platform-admin:PlatformAdminController:GET:sms/templates:listGlobalSmsTemplates",
         "controller_name": "PlatformAdminController",
         "controller_tag": "PlatformAdmin",
@@ -6577,6 +8678,386 @@ export const GENERATED_API_DOC_MODULES: GeneratedApiDocModule[] = [
           "/api/v1/platform-admin/sms/templates/{template_id}",
           "/{app}/v1/platform-admin/sms/templates/{template_id}",
           "/platform-admin/sms/templates/{template_id}"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:smtp/providers:listSmtpProviders",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listSmtpProviders",
+        "summary": "平台 SMTP provider 列表",
+        "route_path": "smtp/providers",
+        "path_templates": [
+          "/api/v1/platform-admin/smtp/providers",
+          "/{app}/v1/platform-admin/smtp/providers",
+          "/platform-admin/smtp/providers"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:POST:smtp/providers:createSmtpProvider",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "POST",
+        "handler": "createSmtpProvider",
+        "summary": "创建平台 SMTP provider",
+        "route_path": "smtp/providers",
+        "path_templates": [
+          "/api/v1/platform-admin/smtp/providers",
+          "/{app}/v1/platform-admin/smtp/providers",
+          "/platform-admin/smtp/providers"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:DELETE:smtp/providers/:provider_id:deleteSmtpProvider",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "DELETE",
+        "handler": "deleteSmtpProvider",
+        "summary": "删除平台 SMTP provider",
+        "route_path": "smtp/providers/{provider_id}",
+        "path_templates": [
+          "/api/v1/platform-admin/smtp/providers/{provider_id}",
+          "/{app}/v1/platform-admin/smtp/providers/{provider_id}",
+          "/platform-admin/smtp/providers/{provider_id}"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:PATCH:smtp/providers/:provider_id:updateSmtpProvider",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "PATCH",
+        "handler": "updateSmtpProvider",
+        "summary": "更新平台 SMTP provider",
+        "route_path": "smtp/providers/{provider_id}",
+        "path_templates": [
+          "/api/v1/platform-admin/smtp/providers/{provider_id}",
+          "/{app}/v1/platform-admin/smtp/providers/{provider_id}",
+          "/platform-admin/smtp/providers/{provider_id}"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:POST:smtp/providers/:provider_id/test:testSmtpProvider",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "POST",
+        "handler": "testSmtpProvider",
+        "summary": "测试平台 SMTP provider",
+        "route_path": "smtp/providers/{provider_id}/test",
+        "path_templates": [
+          "/api/v1/platform-admin/smtp/providers/{provider_id}/test",
+          "/{app}/v1/platform-admin/smtp/providers/{provider_id}/test",
+          "/platform-admin/smtp/providers/{provider_id}/test"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:storage/providers:listStorageProviders",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listStorageProviders",
+        "summary": "平台对象存储 provider 列表",
+        "route_path": "storage/providers",
+        "path_templates": [
+          "/api/v1/platform-admin/storage/providers",
+          "/{app}/v1/platform-admin/storage/providers",
+          "/platform-admin/storage/providers"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:POST:storage/providers:createStorageProvider",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "POST",
+        "handler": "createStorageProvider",
+        "summary": "创建平台对象存储 provider",
+        "route_path": "storage/providers",
+        "path_templates": [
+          "/api/v1/platform-admin/storage/providers",
+          "/{app}/v1/platform-admin/storage/providers",
+          "/platform-admin/storage/providers"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:DELETE:storage/providers/:provider_id:deleteStorageProvider",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "DELETE",
+        "handler": "deleteStorageProvider",
+        "summary": "删除平台对象存储 provider",
+        "route_path": "storage/providers/{provider_id}",
+        "path_templates": [
+          "/api/v1/platform-admin/storage/providers/{provider_id}",
+          "/{app}/v1/platform-admin/storage/providers/{provider_id}",
+          "/platform-admin/storage/providers/{provider_id}"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:PATCH:storage/providers/:provider_id:updateStorageProvider",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "PATCH",
+        "handler": "updateStorageProvider",
+        "summary": "更新平台对象存储 provider",
+        "route_path": "storage/providers/{provider_id}",
+        "path_templates": [
+          "/api/v1/platform-admin/storage/providers/{provider_id}",
+          "/{app}/v1/platform-admin/storage/providers/{provider_id}",
+          "/platform-admin/storage/providers/{provider_id}"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:POST:storage/providers/:provider_id/test:testStorageProvider",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "POST",
+        "handler": "testStorageProvider",
+        "summary": "测试平台对象存储 provider",
+        "route_path": "storage/providers/{provider_id}/test",
+        "path_templates": [
+          "/api/v1/platform-admin/storage/providers/{provider_id}/test",
+          "/{app}/v1/platform-admin/storage/providers/{provider_id}/test",
+          "/platform-admin/storage/providers/{provider_id}/test"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:tasks:listPlatformTasks",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "listPlatformTasks",
+        "summary": "平台任务列表",
+        "route_path": "tasks",
+        "path_templates": [
+          "/api/v1/platform-admin/tasks",
+          "/{app}/v1/platform-admin/tasks",
+          "/platform-admin/tasks"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:POST:tasks:createPlatformTask",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "POST",
+        "handler": "createPlatformTask",
+        "summary": "创建平台任务",
+        "route_path": "tasks",
+        "path_templates": [
+          "/api/v1/platform-admin/tasks",
+          "/{app}/v1/platform-admin/tasks",
+          "/platform-admin/tasks"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:tasks/:task_id:getPlatformTask",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "getPlatformTask",
+        "summary": "平台任务详情",
+        "route_path": "tasks/{task_id}",
+        "path_templates": [
+          "/api/v1/platform-admin/tasks/{task_id}",
+          "/{app}/v1/platform-admin/tasks/{task_id}",
+          "/platform-admin/tasks/{task_id}"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:POST:tasks/:task_id/cancel:cancelPlatformTask",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "POST",
+        "handler": "cancelPlatformTask",
+        "summary": "取消平台任务",
+        "route_path": "tasks/{task_id}/cancel",
+        "path_templates": [
+          "/api/v1/platform-admin/tasks/{task_id}/cancel",
+          "/{app}/v1/platform-admin/tasks/{task_id}/cancel",
+          "/platform-admin/tasks/{task_id}/cancel"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:POST:tasks/:task_id/events:appendPlatformTaskEvent",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "POST",
+        "handler": "appendPlatformTaskEvent",
+        "summary": "追加平台任务事件",
+        "route_path": "tasks/{task_id}/events",
+        "path_templates": [
+          "/api/v1/platform-admin/tasks/{task_id}/events",
+          "/{app}/v1/platform-admin/tasks/{task_id}/events",
+          "/platform-admin/tasks/{task_id}/events"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:POST:tasks/:task_id/logs:appendPlatformTaskLog",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "POST",
+        "handler": "appendPlatformTaskLog",
+        "summary": "追加平台任务日志",
+        "route_path": "tasks/{task_id}/logs",
+        "path_templates": [
+          "/api/v1/platform-admin/tasks/{task_id}/logs",
+          "/{app}/v1/platform-admin/tasks/{task_id}/logs",
+          "/platform-admin/tasks/{task_id}/logs"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:POST:tasks/:task_id/transition:transitionPlatformTask",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "POST",
+        "handler": "transitionPlatformTask",
+        "summary": "更新平台任务状态",
+        "route_path": "tasks/{task_id}/transition",
+        "path_templates": [
+          "/api/v1/platform-admin/tasks/{task_id}/transition",
+          "/{app}/v1/platform-admin/tasks/{task_id}/transition",
+          "/platform-admin/tasks/{task_id}/transition"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": "application/json",
+        "has_body": true,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:GET:tasks/runtime:getPlatformTaskRuntime",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "GET",
+        "handler": "getPlatformTaskRuntime",
+        "summary": "平台任务运行摘要",
+        "route_path": "tasks/runtime",
+        "path_templates": [
+          "/api/v1/platform-admin/tasks/runtime",
+          "/{app}/v1/platform-admin/tasks/runtime",
+          "/platform-admin/tasks/runtime"
+        ],
+        "auth": "admin",
+        "scope": "platform-global",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/platform-admin/platform-admin.controller.ts"
+      },
+      {
+        "id": "platform-admin:PlatformAdminController:POST:tasks/workers/heartbeat:recordPlatformTaskWorkerHeartbeat",
+        "controller_name": "PlatformAdminController",
+        "controller_tag": "PlatformAdmin",
+        "method": "POST",
+        "handler": "recordPlatformTaskWorkerHeartbeat",
+        "summary": "上报平台任务 worker 心跳",
+        "route_path": "tasks/workers/heartbeat",
+        "path_templates": [
+          "/api/v1/platform-admin/tasks/workers/heartbeat",
+          "/{app}/v1/platform-admin/tasks/workers/heartbeat",
+          "/platform-admin/tasks/workers/heartbeat"
         ],
         "auth": "admin",
         "scope": "platform-global",
@@ -6688,6 +9169,35 @@ export const GENERATED_API_DOC_MODULES: GeneratedApiDocModule[] = [
     ]
   },
   {
+    "module_name": "realtime",
+    "module_label": "Realtime",
+    "module_summary": "覆盖 Realtime 相关的接口能力，可用于按模块检索当前 app 可接入的 API。",
+    "module_doc_path": "services/gateway/docs/modules/realtime/README.md",
+    "route_count": 1,
+    "routes": [
+      {
+        "id": "realtime:RealtimeController:GET:status:status",
+        "controller_name": "RealtimeController",
+        "controller_tag": "Realtime",
+        "method": "GET",
+        "handler": "status",
+        "summary": "Realtime gateway status and fanout backend",
+        "route_path": "status",
+        "path_templates": [
+          "/{app}/v1/realtime/status",
+          "/api/v1/realtime/status",
+          "/realtime/status"
+        ],
+        "auth": "unknown",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/realtime/realtime.controller.ts"
+      }
+    ]
+  },
+  {
     "module_name": "redeem",
     "module_label": "兑换与权益",
     "module_summary": "覆盖 兑换与权益 相关的接口能力，可用于按模块检索当前 app 可接入的 API。",
@@ -6713,6 +9223,33 @@ export const GENERATED_API_DOC_MODULES: GeneratedApiDocModule[] = [
         "consumes": null,
         "has_body": false,
         "source_file": "services/gateway/src/modules/redeem/public-products.controller.ts"
+      }
+    ]
+  },
+  {
+    "module_name": "runtime-settings",
+    "module_label": "Runtime Settings",
+    "module_summary": "覆盖 Runtime Settings 相关的接口能力，可用于按模块检索当前 app 可接入的 API。",
+    "module_doc_path": "services/gateway/docs/modules/runtime-settings/README.md",
+    "route_count": 1,
+    "routes": [
+      {
+        "id": "runtime-settings:RuntimeSettingsController:GET:(root):getRuntimeConfig",
+        "controller_name": "RuntimeSettingsController",
+        "controller_tag": "RuntimeSettings",
+        "method": "GET",
+        "handler": "getRuntimeConfig",
+        "summary": "公开运行时配置（不含密钥）",
+        "route_path": "/",
+        "path_templates": [
+          "/runtime-config"
+        ],
+        "auth": "unknown",
+        "scope": "tenant",
+        "supports_app_query": false,
+        "consumes": null,
+        "has_body": false,
+        "source_file": "services/gateway/src/modules/runtime-settings/runtime-settings.controller.ts"
       }
     ]
   },

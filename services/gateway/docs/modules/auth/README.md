@@ -1,7 +1,7 @@
 # Auth 模块文档
 
-> 模块名称：`auth`  
-> 最后更新：2026-06-10
+> 模块名称：`auth`
+> 最后更新：2026-06-20
 
 ## 1. 模块定位
 - 负责 `auth` 业务域的路由、服务与数据处理。
@@ -110,7 +110,6 @@
 - `normalizeSmsPhone()`
 - `normalizeSmsPhoneVariants()`
 - `verifySmsCodeForAppId()`
-- `sendSmsCodeForResolvedApp()`
 - `loginWithSms()`
 - `getWechatLoginUrl()`
 - `getWechatBindUrl()`
@@ -150,6 +149,7 @@
 - `normalizeWechatRedirectUri()`
 - `normalizeWechatRedirectHost()`
 - `buildDefaultWechatRedirectUri()`
+- `getRuntimeOauthSettings()`
 - `buildWechatQrConnectUrl()`
 - `resolveWechatQrContent()`
 - `resolveWechatQrContentWithRetry()`
@@ -169,26 +169,8 @@
 - `buildGitHubPlaceholderEmail()`
 - `normalizeExternalDisplayName()`
 - `buildPhonePlaceholderEmail()`
-- `buildPhoneIdentityVariants()`
 - `pickPhoneLoginUser()`
 - `ensureRefreshSessionSchema()`
-- `ensureSmsVerificationSchema()`
-- `assertSmsSendCooldown()`
-- `verifySmsCode()`
-- `hashSmsCode()`
-- `resolveSmsDispatchMode()`
-- `deleteSmsCode()`
-- `normalizePhone()`
-- `normalizeSmsCode()`
-- `parseBooleanLike()`
-- `parseSmsProviderType()`
-- `extractAppSmsRouteConfig()`
-- `resolveSmsRouteConfig()`
-- `buildSmsRouteCacheKey()`
-- `rethrowSmsDispatchFetchError()`
-- `pickSmsTemplateVariables()`
-- `buildAliyunSignedUrl()`
-- `aliyunPercentEncode()`
 - `ensureWechatOpenAppSchema()`
 - `ensureGoogleOAuthClientSchema()`
 - `ensureGitHubOAuthAppSchema()`
@@ -202,6 +184,8 @@
 - `findActiveAuthSession()`
 - `dateFromUnixSeconds()`
 - `dateFromTokenTime()`
+- `resolveSessionPolicy()`
+- `boundedInteger()`
 - `getRefreshTokenInactivityMs()`
 - `getRefreshTokenAbsoluteMs()`
 - `validateSessionUser()`
@@ -241,6 +225,7 @@
 - `resolveAppWithSettings()`
 - `resolveAppByIdWithSettings()`
 - `getTransporter()`
+- `createTransporter()`
 - `readAppSettingsCache()`
 - `writeAppSettingsCache()`
 
@@ -283,6 +268,8 @@
 - `email-delivery`
 - `outbound-proxy`
 - `redeem`
+- `runtime-settings`
+- `sms`
 
 ## 7. 维护清单
 - [ ] 路由变更后已同步更新本文档（含请求/响应变化）
@@ -292,4 +279,4 @@
 - [ ] 已补充联调示例（如涉及外部调用）
 
 ## 8. 变更记录
-- 2026-06-10：自动生成/刷新模块文档结构与清单。
+- 2026-06-20：自动生成/刷新模块文档结构与清单。

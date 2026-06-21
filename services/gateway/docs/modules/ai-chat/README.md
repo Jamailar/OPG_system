@@ -1,7 +1,7 @@
 # Ai Chat 模块文档
 
-> 模块名称：`ai-chat`  
-> 最后更新：2026-06-10
+> 模块名称：`ai-chat`
+> 最后更新：2026-06-20
 
 ## 1. 模块定位
 - 负责 `ai-chat` 业务域的路由、服务与数据处理。
@@ -12,6 +12,7 @@
 - `src/modules/ai-chat/ai-chat.module.ts`
 - `src/modules/ai-chat/ai-chat.service.ts`
 - `src/modules/ai-chat/ai-gateway-error-classifier.service.ts`
+- `src/modules/ai-chat/ai-gateway-observability.service.ts`
 - `src/modules/ai-chat/ai-gateway-scheduler.service.ts`
 - `src/modules/ai-chat/ai-gateway-throttle.service.ts`
 - `src/modules/ai-chat/ai-gateway-usage-queue.service.ts`
@@ -133,6 +134,7 @@
 - `buildModelPricingCacheKey()`
 - `readModelPricingCache()`
 - `writeModelPricingCache()`
+- `clearModelPricingCacheForApp()`
 - `chatLegacy()`
 - `forwardChatCompletions()`
 - `forwardCompletions()`
@@ -233,11 +235,6 @@
 - `createOfficialOpenAiClient()`
 - `buildRouteFetch()`
 - `withStreamUsageOptions()`
-- `loadAliyunIceSdk()`
-- `createAliyunIceClient()`
-- `normalizeAliyunIceEndpoint()`
-- `extractAliyunRegionFromEndpoint()`
-- `normalizeAliyunIceSdkResponse()`
 - `isTextLikeUpstreamContentType()`
 - `resolveOfficialOpenAiSdkErrorMessage()`
 - `buildMultipartForm()`
@@ -379,8 +376,11 @@
 - `convertRmbToPoints()`
 - `resolveAiUsagePointsEventType()`
 - `buildAiUsageReferenceId()`
+- `buildGatewayEventRequestId()`
+- `extractResponseRequestId()`
 - `buildAsyncVideoReservationKey()`
 - `buildSyncImageReservationKey()`
+- `buildSyncInvocationReservationKey()`
 - `buildAsyncVideoPublicTaskId()`
 - `resolveDashscopeVideoConcurrencyLimit()`
 - `resolveAppIdBySlug()`
@@ -441,8 +441,6 @@
 - `normalizePositiveIntegerOrNull()`
 - `normalizePositiveIntegerOrZero()`
 - `normalizeObject()`
-- `normalizeAliyunIceInputType()`
-- `stringifyJsonField()`
 - `collectUrlStrings()`
 - `safeJsonPreview()`
 - `logAiTrace()`
@@ -454,7 +452,8 @@
 - `normalizeMultipartHeaders()`
 - `numberOrDefault()`
 - `boundNumber()`
-- `readBoundedInt()`
+- `ensureAiGatewayTuningFresh()`
+- `refreshAiGatewayTuning()`
 - `sleep()`
 - `minimaxTtsKeyQueueKey()`
 - `hashSecret()`
@@ -476,13 +475,46 @@
 - `shouldCooldown()`
 - `shouldTryNextRoute()`
 
+### AiGatewayObservabilityService
+- 服务文件：`src/modules/ai-chat/ai-gateway-observability.service.ts`
+- 核心方法：
+- `onModuleInit()`
+- `recordRequestEvent()`
+- `recordRequestEventSafe()`
+- `recordRouteHealth()`
+- `recordRouteHealthSafe()`
+- `recordAuditEvent()`
+- `recordAuditEventSafe()`
+- `listProviderHealth()`
+- `listRequestEvents()`
+- `listAuditEvents()`
+- `ensureSchema()`
+- `initSchema()`
+- `arePrerequisiteTablesReady()`
+- `hashSnapshot()`
+- `redact()`
+- `stableStringify()`
+- `normalizeMetadata()`
+- `normalizeNullableUuid()`
+- `normalizeNullableString()`
+- `normalizeRequiredString()`
+- `normalizeNullableInt()`
+- `parsePaging()`
+- `paginated()`
+- `addUuidFilter()`
+- `addTextFilter()`
+- `addBooleanFilter()`
+- `addDaysFilter()`
+
 ### AiGatewaySchedulerService
 - 服务文件：`src/modules/ai-chat/ai-gateway-scheduler.service.ts`
 - 核心方法：
 - `getStats()`
 - `rememberStickyRoute()`
 - `stringOrUndefined()`
-- `readNonNegativeInt()`
+- `getStickyTtlMs()`
+- `loadStickyTtlMs()`
+- `numberValue()`
 
 ### AiGatewayThrottleService
 - 服务文件：`src/modules/ai-chat/ai-gateway-throttle.service.ts`
@@ -501,14 +533,16 @@
 - `incrementActive()`
 - `decrementActive()`
 - `shouldCooldownForFailure()`
-- `acquireRedis()`
 - `buildRedisRelease()`
 - `getRedis()`
 - `redisKey()`
 - `hashLimitSegment()`
 - `acquireRedisLua()`
 - `releaseRedisLua()`
-- `readNonNegativeInt()`
+- `getTuning()`
+- `loadTuning()`
+- `booleanValue()`
+- `numberValue()`
 
 ### AiGatewayUsageQueueService
 - 服务文件：`src/modules/ai-chat/ai-gateway-usage-queue.service.ts`
@@ -516,8 +550,9 @@
 - `getStats()`
 - `drain()`
 - `runQueuedTask()`
-- `readOverflowPolicy()`
-- `readPositiveInt()`
+- `ensureTuningFresh()`
+- `refreshTuning()`
+- `numberValue()`
 
 ### InsufficientAiPointsError
 - 服务文件：`src/modules/ai-chat/ai-points.service.ts`
@@ -651,11 +686,6 @@
 - `normalizeEndpointPathForProvider()`
 - `isDashscopeNativeApiType()`
 - `isDashscopeSource()`
-- `isAliyunIceSource()`
-- `resolveAliyunIceAccessKeySecret()`
-- `normalizeAliyunIceEndpoint()`
-- `extractAliyunRegionFromEndpoint()`
-- `normalizeAliyunIceProbeResponse()`
 - `normalizeDashscopeNativeBaseUrl()`
 - `joinDashscopeNativeUrl()`
 - `normalizeDashscopeImageSize()`
@@ -733,7 +763,9 @@
 - `buildGatewayRequestId()`
 - `assertRequestBodyWithinLimit()`
 - `redactUrl()`
-- `readPositiveInt()`
+- `getTuning()`
+- `loadTuning()`
+- `numberValue()`
 
 ### AiVideoResultProxyService
 - 服务文件：`src/modules/ai-chat/ai-video-result-proxy.service.ts`
@@ -774,6 +806,7 @@
 - `activateMapping()`
 - `migrateVoice()`
 - `retryClone()`
+- `resolveVoiceCloneModelKey()`
 - `processMigrationJobs()`
 - `processMigrationJobItems()`
 - `persistSample()`
@@ -848,11 +881,15 @@
 - `ai_app_capability_defaults`
 - `ai_app_default_model_slots`
 - `ai_app_model_routes`
+- `ai_app_model_visibility`
 - `ai_async_video_tasks`
+- `ai_audit_events`
+- `ai_gateway_request_events`
 - `ai_global_models`
 - `ai_global_source_api_keys`
 - `ai_global_sources`
 - `ai_model_source_routes`
+- `ai_provider_health`
 - `ai_usage_daily_facts`
 - `ai_usage_fact_refresh_state`
 - `ai_usage_logs`
@@ -881,7 +918,9 @@
 - `..`
 - `api-keys`
 - `auth`
+- `developer-sdk`
 - `outbound-proxy`
+- `runtime-settings`
 - `upload`
 
 ## 7. 维护清单
@@ -892,4 +931,4 @@
 - [ ] 已补充联调示例（如涉及外部调用）
 
 ## 8. 变更记录
-- 2026-06-10：自动生成/刷新模块文档结构与清单。
+- 2026-06-20：自动生成/刷新模块文档结构与清单。

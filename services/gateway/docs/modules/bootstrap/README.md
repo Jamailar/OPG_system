@@ -1,35 +1,36 @@
-# Discovery 模块文档
+# Bootstrap 模块文档
 
-> 模块名称：`discovery`
+> 模块名称：`bootstrap`
 > 最后更新：2026-06-20
 
 ## 1. 模块定位
-- 负责 `discovery` 业务域的路由、服务与数据处理。
+- 负责 `bootstrap` 业务域的路由、服务与数据处理。
 - 本文档用于模块级维护、交接与变更审查。
 
 ## 2. 源码目录
-- `src/modules/discovery/discovery.controller.ts`
-- `src/modules/discovery/discovery.module.ts`
-- `src/modules/discovery/discovery.service.ts`
+- `src/modules/bootstrap/bootstrap.controller.ts`
+- `src/modules/bootstrap/bootstrap.module.ts`
+- `src/modules/bootstrap/bootstrap.service.ts`
 
 ## 3. Controller 与路由
-### DiscoveryController
-- 控制器文件：`src/modules/discovery/discovery.controller.ts`
-- 基础路由：`'discovery'`
+### BootstrapController
+- 控制器文件：`src/modules/bootstrap/bootstrap.controller.ts`
+- 基础路由：`tenantControllerPaths('bootstrap', true)`
 
 | HTTP 方法 | 路径 | 处理函数 |
 | --- | --- | --- |
-| GET | `admin-context` | `resolveAdminContext()` |
+| GET | `status` | `getStatus()` |
+| POST | `platform-admin` | `createPlatformAdmin()` |
 
 ## 4. Service 能力
-### DiscoveryService
-- 服务文件：`src/modules/discovery/discovery.service.ts`
+### BootstrapService
+- 服务文件：`src/modules/bootstrap/bootstrap.service.ts`
 - 核心方法：
-- `resolveAdminContext()`
-- `resolveAdminContextBySlug()`
-- `normalizeHost()`
-- `normalizeSlug()`
-- `splitHostPort()`
+- `getStatus()`
+- `createPlatformAdmin()`
+- `platformSlug()`
+- `platformSuperAdminExists()`
+- `normalizeEmail()`
 
 ## 5. 数据库/存储依赖（自动扫描）
 - （未检测到显式 SQL 表名，可能使用 Prisma ORM 查询）

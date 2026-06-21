@@ -1,0 +1,99 @@
+# Platform Tasks 模块文档
+
+> 模块名称：`platform-tasks`
+> 最后更新：2026-06-20
+
+## 1. 模块定位
+- 负责 `platform-tasks` 业务域的路由、服务与数据处理。
+- 本文档用于模块级维护、交接与变更审查。
+
+## 2. 源码目录
+- `src/modules/platform-tasks/platform-task-queue.service.ts`
+- `src/modules/platform-tasks/platform-task-worker.service.ts`
+- `src/modules/platform-tasks/platform-tasks.module.ts`
+- `src/modules/platform-tasks/platform-tasks.service.ts`
+- `src/modules/platform-tasks/platform-tasks.types.ts`
+
+## 3. Controller 与路由
+当前模块没有 Controller 文件。
+
+## 4. Service 能力
+### PlatformTaskQueueService
+- 服务文件：`src/modules/platform-tasks/platform-task-queue.service.ts`
+- 核心方法：
+- `onModuleInit()`
+- `onApplicationShutdown()`
+- `enqueue()`
+- `getStatus()`
+- `initialize()`
+- `normalizePriority()`
+
+### PlatformTaskWorkerService
+- 服务文件：`src/modules/platform-tasks/platform-task-worker.service.ts`
+- 核心方法：
+- `onModuleInit()`
+- `onApplicationShutdown()`
+- `pollDatabaseQueue()`
+- `heartbeat()`
+- `startBullWorker()`
+- `intEnv()`
+
+### PlatformTasksService
+- 服务文件：`src/modules/platform-tasks/platform-tasks.service.ts`
+- 核心方法：
+- `onModuleInit()`
+- `getRuntime()`
+- `registerHandler()`
+- `listRegisteredHandlers()`
+- `createTask()`
+- `listTasks()`
+- `getTask()`
+- `transitionTask()`
+- `cancelTask()`
+- `claimTaskById()`
+- `claimNextRunnableTask()`
+- `executeClaimedTask()`
+- `updateTaskProgress()`
+- `appendEvent()`
+- `appendLog()`
+- `getSummary()`
+- `ensureSchema()`
+- `checkSchema()`
+- `parsePaging()`
+- `paginated()`
+- `addUuidFilter()`
+- `addTextFilter()`
+- `addStatusFilter()`
+- `addDaysFilter()`
+- `requiredText()`
+- `nullableText()`
+- `requiredUuid()`
+- `nullableUuid()`
+- `intValue()`
+- `objectValue()`
+- `normalizeLogStream()`
+- `handlerKey()`
+- `redactMessage()`
+- `defaultWorkerId()`
+
+## 5. 数据库/存储依赖（自动扫描）
+- `next_seq`
+- `picked`
+- `platform_task_events`
+- `platform_task_logs`
+- `platform_tasks`
+- `platform_worker_heartbeats`
+- `skip`
+
+## 6. 模块依赖（自动扫描）
+- （未检测到模块级依赖导入）
+
+## 7. 维护清单
+- [ ] 路由变更后已同步更新本文档（含请求/响应变化）
+- [ ] Service 新增公开方法已补充用途说明
+- [ ] 数据表变更已补充影响说明与迁移步骤
+- [ ] 已确认与上游模块依赖关系未破坏
+- [ ] 已补充联调示例（如涉及外部调用）
+
+## 8. 变更记录
+- 2026-06-20：自动生成/刷新模块文档结构与清单。

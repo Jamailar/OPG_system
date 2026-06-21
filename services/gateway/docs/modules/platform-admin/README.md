@@ -1,13 +1,14 @@
 # Platform Admin 模块文档
 
-> 模块名称：`platform-admin`  
-> 最后更新：2026-06-10
+> 模块名称：`platform-admin`
+> 最后更新：2026-06-20
 
 ## 1. 模块定位
 - 负责 `platform-admin` 业务域的路由、服务与数据处理。
 - 本文档用于模块级维护、交接与变更审查。
 
 ## 2. 源码目录
+- `src/modules/platform-admin/built-in-test-app-seed.service.ts`
 - `src/modules/platform-admin/feedback-admin-api.controller.ts`
 - `src/modules/platform-admin/guards/platform-admin-ai-debug-jwt-auth.guard.ts`
 - `src/modules/platform-admin/platform-admin.controller.ts`
@@ -41,6 +42,41 @@
 | HTTP 方法 | 路径 | 处理函数 |
 | --- | --- | --- |
 | GET | `apps` | `listApps()` |
+| GET | `runtime-settings` | `getRuntimeSettings()` |
+| PATCH | `runtime-settings` | `updateRuntimeSettings()` |
+| GET | `observability/runtime` | `getPlatformObservabilityRuntime()` |
+| GET | `observability/request-events` | `listPlatformRequestEvents()` |
+| GET | `observability/audit-events` | `listPlatformAuditEvents()` |
+| GET | `apps/:app_id/observability/request-events` | `listAppPlatformRequestEvents()` |
+| GET | `apps/:app_id/observability/audit-events` | `listAppPlatformAuditEvents()` |
+| GET | `tasks/runtime` | `getPlatformTaskRuntime()` |
+| GET | `tasks` | `listPlatformTasks()` |
+| GET | `tasks/:task_id` | `getPlatformTask()` |
+| GET | `apps/:app_id/tasks` | `listAppPlatformTasks()` |
+| GET | `apps/:app_id/tasks/:task_id` | `getAppPlatformTask()` |
+| POST | `tasks` | `createPlatformTask()` |
+| POST | `tasks/:task_id/transition` | `transitionPlatformTask()` |
+| POST | `tasks/:task_id/events` | `appendPlatformTaskEvent()` |
+| POST | `tasks/:task_id/logs` | `appendPlatformTaskLog()` |
+| POST | `tasks/:task_id/cancel` | `cancelPlatformTask()` |
+| POST | `tasks/workers/heartbeat` | `recordPlatformTaskWorkerHeartbeat()` |
+| GET | `storage/providers` | `listStorageProviders()` |
+| POST | `storage/providers` | `createStorageProvider()` |
+| PATCH | `storage/providers/:provider_id` | `updateStorageProvider()` |
+| DELETE | `storage/providers/:provider_id` | `deleteStorageProvider()` |
+| POST | `storage/providers/:provider_id/test` | `testStorageProvider()` |
+| GET | `integration-api-keys` | `listPlatformApiKeys()` |
+| POST | `integration-api-keys` | `createPlatformApiKey()` |
+| POST | `integration-api-keys/:api_key_id/revoke` | `revokePlatformApiKey()` |
+| GET | `developer-authorizations/scopes` | `listDeveloperAuthorizationScopes()` |
+| GET | `developer-authorizations/grants` | `listDeveloperAuthorizationGrants()` |
+| PATCH | `developer-authorizations/grants/:grant_id` | `updateDeveloperAuthorizationGrant()` |
+| POST | `developer-authorizations/grants/:grant_id/revoke` | `revokeDeveloperAuthorizationGrant()` |
+| GET | `smtp/providers` | `listSmtpProviders()` |
+| POST | `smtp/providers` | `createSmtpProvider()` |
+| PATCH | `smtp/providers/:provider_id` | `updateSmtpProvider()` |
+| DELETE | `smtp/providers/:provider_id` | `deleteSmtpProvider()` |
+| POST | `smtp/providers/:provider_id/test` | `testSmtpProvider()` |
 | GET | `wechat/open-apps` | `listGlobalWechatOpenApps()` |
 | POST | `wechat/open-apps` | `createGlobalWechatOpenApp()` |
 | PUT | `wechat/open-apps/:open_app_id` | `updateGlobalWechatOpenApp()` |
@@ -72,6 +108,13 @@
 | POST | `apple/login-credentials/:credential_id/test` | `testGlobalAppleLoginCredential()` |
 | GET | `payments/methods` | `listGlobalPaymentMethods()` |
 | GET | `email/cloudflare/accounts` | `listEmailCloudflareAccounts()` |
+| GET | `email/providers/catalog` | `listEmailProviderCatalog()` |
+| GET | `email/providers` | `listEmailProviders()` |
+| POST | `email/providers` | `createEmailProvider()` |
+| PATCH | `email/providers/:provider_id` | `updateEmailProvider()` |
+| DELETE | `email/providers/:provider_id` | `deleteEmailProvider()` |
+| POST | `email/providers/:provider_id/test` | `testEmailProvider()` |
+| GET | `email/providers/:provider_id/sending-domains` | `listEmailProviderSendingDomains()` |
 | POST | `email/cloudflare/accounts` | `createEmailCloudflareAccount()` |
 | POST | `email/cloudflare/accounts/verify-token` | `verifyEmailCloudflareToken()` |
 | PATCH | `email/cloudflare/accounts/:account_id` | `updateEmailCloudflareAccount()` |
@@ -161,6 +204,9 @@
 | GET | `ai/sources` | `listGlobalAiSources()` |
 | GET | `ai/provider-templates` | `listGlobalAiProviderTemplates()` |
 | GET | `ai/gateway/runtime` | `getAiGatewayRuntimeStats()` |
+| GET | `ai/gateway/provider-health` | `listAiGatewayProviderHealth()` |
+| GET | `ai/gateway/request-events` | `listAiGatewayRequestEvents()` |
+| GET | `ai/audit-events` | `listAiAuditEvents()` |
 | POST | `ai/sources` | `createGlobalAiSource()` |
 | POST | `ai/sources/test` | `testGlobalAiSourceConnectivity()` |
 | PUT | `ai/sources/:source_id` | `updateGlobalAiSource()` |
@@ -181,6 +227,7 @@
 | GET | `apps/:app_id/ai/model-routes` | `listAppAiModelRoutes()` |
 | PUT | `apps/:app_id/ai/model-routes/:model_id` | `upsertAppAiModelRoute()` |
 | DELETE | `apps/:app_id/ai/model-routes/:model_id` | `deleteAppAiModelRoute()` |
+| PUT | `apps/:app_id/ai/model-visibility/:model_id` | `updateAppAiModelVisibility()` |
 | GET | `apps/:app_id/ai/default-models` | `listAppAiCapabilityDefaults()` |
 | PUT | `apps/:app_id/ai/default-models/:capability` | `upsertAppAiCapabilityDefault()` |
 | DELETE | `apps/:app_id/ai/default-models/:capability` | `deleteAppAiCapabilityDefault()` |
@@ -212,10 +259,24 @@
 | POST | `apps/:app_id/redeem/codes/:code/void` | `voidRedeemCode()` |
 
 ## 4. Service 能力
+### BuiltInTestAppSeedService
+- 服务文件：`src/modules/platform-admin/built-in-test-app-seed.service.ts`
+- 核心方法：
+- `onModuleInit()`
+- `ensureTestAppSeed()`
+- `ensureAppSettings()`
+- `ensureUsers()`
+- `ensurePaymentProducts()`
+- `ensurePaymentFixtureSchema()`
+
 ### PlatformAdminService
 - 服务文件：`src/modules/platform-admin/platform-admin.service.ts`
 - 核心方法：
 - `onModuleInit()`
+- `platformAppSlug()`
+- `isPlatformAppSlug()`
+- `assertTenantSlugAllowed()`
+- `normalizeAppKind()`
 - `listApps()`
 - `listGlobalWechatOpenApps()`
 - `deleteGlobalWechatOpenApp()`
@@ -234,23 +295,16 @@
 - `listGlobalPaymentMethods()`
 - `deleteGlobalPaymentMethod()`
 - `testGlobalPaymentMethod()`
-- `listSmsProviderCatalog()`
 - `listGlobalSmsProviders()`
-- `createGlobalSmsProvider()`
-- `updateGlobalSmsProvider()`
 - `deleteGlobalSmsProvider()`
-- `testGlobalSmsProvider()`
 - `listGlobalSmsSignatures()`
-- `createGlobalSmsSignature()`
-- `updateGlobalSmsSignature()`
 - `deleteGlobalSmsSignature()`
 - `listGlobalSmsTemplates()`
-- `createGlobalSmsTemplate()`
-- `updateGlobalSmsTemplate()`
 - `deleteGlobalSmsTemplate()`
+- `listAppPaymentProductsForTest()`
+- `listSmsProviderCatalog()`
 - `listSmsMessageEvents()`
 - `getSmsObservabilitySummary()`
-- `listAppPaymentProductsForTest()`
 - `getAppDetail()`
 - `createApp()`
 - `updateApp()`
@@ -535,7 +589,9 @@
 - `alipay_agreements`
 - `alipay_deductions`
 - `alipay_orders`
+- `alipay_refunds`
 - `analytics_fact_refresh_state`
+- `app_settings`
 - `app_slug_aliases`
 - `app_user_activity_summary`
 - `app_user_ai_usage_summary`
@@ -579,9 +635,6 @@
 - `period_ranges`
 - `periods`
 - `platform_payment_methods`
-- `platform_sms_providers`
-- `platform_sms_signatures`
-- `platform_sms_templates`
 - `points_wallets`
 - `reactivated`
 - `reactivation_daily`
@@ -591,6 +644,7 @@
 - `user_ai_points_ledger`
 - `user_ai_points_wallets`
 - `user_behavior_events`
+- `user_entitlements`
 - `user_totals`
 - `users`
 - `wau`
@@ -601,11 +655,15 @@
 - `ai-chat`
 - `auth`
 - `behavior-analytics`
+- `developer-sdk`
 - `email-delivery`
 - `feedback`
 - `outbound-proxy`
 - `payments`
+- `platform-tasks`
 - `redeem`
+- `runtime-settings`
+- `sms`
 - `tenant-site`
 
 ## 7. 维护清单
@@ -616,4 +674,4 @@
 - [ ] 已补充联调示例（如涉及外部调用）
 
 ## 8. 变更记录
-- 2026-06-10：自动生成/刷新模块文档结构与清单。
+- 2026-06-20：自动生成/刷新模块文档结构与清单。

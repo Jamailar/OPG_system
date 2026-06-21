@@ -1,97 +1,121 @@
-# SMS Module
+# Sms 模块文档
 
-## 1. 模块职责
+> 模块名称：`sms`
+> 最后更新：2026-06-20
 
-`src/modules/sms` 是独立短信模块，负责验证码发送、供应商/签名/模板管理、App 级短信路由、发送审计和可观测日志。
+## 1. 模块定位
+- 负责 `sms` 业务域的路由、服务与数据处理。
+- 本文档用于模块级维护、交接与变更审查。
 
-Auth、Users、PlatformAdmin 不直接维护短信表或供应商协议，只通过 `SmsService` 调用：
+## 2. 源码目录
+- `src/modules/sms/sms.module.ts`
+- `src/modules/sms/sms.service.ts`
+- `src/modules/sms/sms.types.ts`
 
+## 3. Controller 与路由
+当前模块没有 Controller 文件。
+
+## 4. Service 能力
+### SmsService
+- 服务文件：`src/modules/sms/sms.service.ts`
+- 核心方法：
+- `onModuleInit()`
+- `getProviderCatalog()`
+- `listProviders()`
+- `deleteProvider()`
+- `testProvider()`
+- `listSignatures()`
+- `deleteSignature()`
+- `listTemplates()`
+- `deleteTemplate()`
 - `sendSmsCode()`
 - `sendSmsCodeForAppId()`
 - `verifySmsCodeForAppId()`
-- `sendSmsCodeForAppTest()`
-- `listProviders()` / `createProvider()` / `updateProvider()` / `deleteProvider()`
-- `listSignatures()` / `createSignature()` / `updateSignature()` / `deleteSignature()`
-- `listTemplates()` / `createTemplate()` / `updateTemplate()` / `deleteTemplate()`
-- `listEvents()` / `getSummary()`
+- `normalizeSmsPhone()`
+- `normalizeSmsPhoneVariants()`
+- `normalizeSmsVerificationCode()`
+- `getSummary()`
+- `sendSmsCodeForResolvedApp()`
+- `dispatchGenericApi()`
+- `dispatchAliyun()`
+- `dispatchTencent()`
+- `dispatchHuawei()`
+- `dispatchVolcengine()`
+- `dispatchTwilio()`
+- `dispatchVonage()`
+- `dispatchMessageBird()`
+- `dispatchPlivo()`
+- `dispatchAwsSns()`
+- `resolveSmsRouteConfig()`
+- `ensureSmsSchema()`
+- `initializeSmsSchema()`
+- `normalizeProviderConfig()`
+- `mergeProviderConfigForUpdate()`
+- `assertProviderConfig()`
+- `serializeProvider()`
+- `serializeSignature()`
+- `serializeTemplate()`
+- `serializeEvent()`
+- `maskProviderConfig()`
+- `getProviderRow()`
+- `getSignatureRow()`
+- `getTemplateRow()`
+- `storeSmsCode()`
+- `verifySmsCode()`
+- `deleteSmsCode()`
+- `assertSmsSendCooldown()`
+- `recordConfigAudit()`
+- `resolveDispatchMode()`
+- `defaultDispatchMode()`
+- `parseProviderType()`
+- `providerLabel()`
+- `resolveProviderHealthUrl()`
+- `buildTemplatePayload()`
+- `buildGenericHeaders()`
+- `renderTemplateMessage()`
+- `resolveOrderedTemplateParams()`
+- `pickTemplateCode()`
+- `pickTemplateVariables()`
+- `buildAliyunSignedUrl()`
+- `aliyunPercentEncode()`
+- `getAwsSignatureKey()`
+- `fetchOrThrow()`
+- `rethrowFetchError()`
+- `parseJsonResponse()`
+- `pickProviderError()`
+- `extractAppSmsRouteConfig()`
+- `resolveAppWithSettings()`
+- `resolveAppByIdWithSettings()`
+- `normalizePhone()`
+- `buildPhoneIdentityVariants()`
+- `normalizeSmsCode()`
+- `generateVerificationCode()`
+- `hashSmsCode()`
+- `hashPhone()`
+- `maskPhone()`
+- `maskSecret()`
+- `parseBooleanLike()`
+- `clampTimeout()`
+- `clampInteger()`
+- `describeNetworkFailure()`
+- `truncateJson()`
 
-## 2. 支持的供应商格式
-
-中国大陆主流：
-
-- `ALIYUN_SMS`
-- `TENCENT_SMS`
-- `HUAWEI_SMS`
-- `VOLCENGINE_SMS`
-
-海外主流：
-
-- `TWILIO_SMS`
-- `VONAGE_SMS`
-- `MESSAGEBIRD_SMS`
-- `PLIVO_SMS`
-- `AWS_SNS`
-
-通用扩展：
-
-- `GENERIC_API`
-
-## 3. 配置模型
-
-供应商、签名、模板均在 Web 的平台短信服务页维护，不依赖环境变量。
-
-App 工作区通过 `app_settings.extra_json` 保存短信路由引用：
-
-- `sms_provider_ref_id`
-- `sms_signature_ref_id`
-- `sms_template_ref_id`
-
-路由解析顺序：
-
-1. 优先使用 App 显式选择的供应商、签名、模板。
-2. 未选择模板时，使用该供应商默认启用模板。
-3. 未选择签名时，使用该供应商默认启用签名。
-4. 未选择供应商时，使用平台默认启用供应商。
-5. 模板和签名必须属于最终选中的供应商，否则拒绝发送。
-
-## 4. 数据表
-
+## 5. 数据库/存储依赖（自动扫描）
+- `auth_sms_verification_codes`
+- `platform_sms_message_events`
 - `platform_sms_providers`
 - `platform_sms_signatures`
 - `platform_sms_templates`
-- `auth_sms_verification_codes`
-- `platform_sms_message_events`
 
-`platform_sms_message_events` 同时记录发送事件和配置审计事件。手机号只保存 hash 和脱敏值。
+## 6. 模块依赖（自动扫描）
+- （未检测到模块级依赖导入）
 
-## 5. 可观测性
+## 7. 维护清单
+- [ ] 路由变更后已同步更新本文档（含请求/响应变化）
+- [ ] Service 新增公开方法已补充用途说明
+- [ ] 数据表变更已补充影响说明与迁移步骤
+- [ ] 已确认与上游模块依赖关系未破坏
+- [ ] 已补充联调示例（如涉及外部调用）
 
-平台接口：
-
-- `GET /platform-admin/sms/provider-catalog`
-- `GET /platform-admin/sms/events`
-- `GET /platform-admin/sms/summary`
-
-发送事件记录：
-
-- trace id
-- app id
-- purpose
-- provider/signature/template
-- dispatch mode
-- status
-- provider response code/message id
-- duration
-- error json
-
-## 6. 模板说明
-
-国内供应商通常使用服务商审批后的 `template_code`。
-
-海外文本型供应商可在模板 `meta.message_template` 配置短信正文，例如：
-
-```text
-Your verification code is {{code}}.
-```
-
-模板变量存放在 `meta.variables_example`。需要固定参数顺序的供应商可通过 `meta.variable_order` 控制参数数组顺序。
+## 8. 变更记录
+- 2026-06-20：自动生成/刷新模块文档结构与清单。
