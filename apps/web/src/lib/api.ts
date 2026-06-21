@@ -4072,6 +4072,16 @@ export const platformApi = {
     return response.data?.data || response.data;
   },
 
+  updateConnectorCredential: async (appId: string, connector: string, credential: string, payload: Record<string, unknown>) => {
+    const response = await apiClient.getClient().patch(`/platform-admin/apps/${appId}/connectors/${connector}/credentials/${credential}`, payload);
+    return response.data?.data || response.data;
+  },
+
+  deleteConnectorCredential: async (appId: string, connector: string, credential: string) => {
+    const response = await apiClient.getClient().delete(`/platform-admin/apps/${appId}/connectors/${connector}/credentials/${credential}`);
+    return response.data?.data || response.data;
+  },
+
   listConnectorActions: async (appId: string, connector: string): Promise<{ items: PlatformConnectorActionItem[] }> => {
     const response = await apiClient.getClient().get(`/platform-admin/apps/${appId}/connectors/${connector}/actions`);
     return response.data?.data || response.data;
@@ -4079,6 +4089,16 @@ export const platformApi = {
 
   createConnectorAction: async (appId: string, connector: string, payload: Record<string, unknown>) => {
     const response = await apiClient.getClient().post(`/platform-admin/apps/${appId}/connectors/${connector}/actions`, payload);
+    return response.data?.data || response.data;
+  },
+
+  updateConnectorAction: async (appId: string, connector: string, action: string, payload: Record<string, unknown>) => {
+    const response = await apiClient.getClient().patch(`/platform-admin/apps/${appId}/connectors/${connector}/actions/${action}`, payload);
+    return response.data?.data || response.data;
+  },
+
+  deleteConnectorAction: async (appId: string, connector: string, action: string) => {
+    const response = await apiClient.getClient().delete(`/platform-admin/apps/${appId}/connectors/${connector}/actions/${action}`);
     return response.data?.data || response.data;
   },
 

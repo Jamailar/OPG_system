@@ -210,12 +210,20 @@ export default function PlatformConnectorsPage() {
     setSaving('credential');
     setMessage('');
     try {
-      await platformApi.createConnectorCredential(selectedAppId, selectedConnector.id, {
+      const payload: Record<string, unknown> = {
         slug: credentialForm.slug,
         auth_mode: credentialForm.auth_mode,
         public_config: parseJsonObject(credentialForm.public_config, 'public_config'),
-        secrets: parseJsonObject(credentialForm.secrets, 'secrets'),
-      });
+      };
+      const existing = credentials.find((item) => item.slug === credentialForm.slug);
+      if (credentialForm.secrets.trim() || !existing) {
+        payload.secrets = parseJsonObject(credentialForm.secrets, 'secrets');
+      }
+      if (existing) {
+        await platformApi.updateConnectorCredential(selectedAppId, selectedConnector.id, existing.id, payload);
+      } else {
+        await platformApi.createConnectorCredential(selectedAppId, selectedConnector.id, payload);
+      }
       await loadConnectorDetail(selectedConnector.id);
     } catch (error: unknown) {
       setMessage(pickApiErrorMessage(error, '保存凭证失败'));
@@ -230,7 +238,7 @@ export default function PlatformConnectorsPage() {
     setSaving('action');
     setMessage('');
     try {
-      await platformApi.createConnectorAction(selectedAppId, selectedConnector.id, {
+      const payload = {
         slug: actionForm.slug,
         method: actionForm.method,
         path_template: actionForm.path_template,
@@ -238,7 +246,13 @@ export default function PlatformConnectorsPage() {
         input_schema: parseJsonObject(actionForm.input_schema, 'input_schema'),
         request_mapping: parseJsonObject(actionForm.request_mapping, 'request_mapping'),
         response_mapping: parseJsonObject(actionForm.response_mapping, 'response_mapping'),
-      });
+      };
+      const existing = actions.find((item) => item.slug === actionForm.slug);
+      if (existing) {
+        await platformApi.updateConnectorAction(selectedAppId, selectedConnector.id, existing.id, payload);
+      } else {
+        await platformApi.createConnectorAction(selectedAppId, selectedConnector.id, payload);
+      }
       setActionForm((prev) => ({ ...EMPTY_ACTION, credential_id: prev.credential_id }));
       await loadConnectorDetail(selectedConnector.id);
     } catch (error: unknown) {
@@ -351,7 +365,12 @@ export default function PlatformConnectorsPage() {
                 </thead>
                 <tbody>
                   {credentials.map((item) => (
-                    <tr key={item.id}>
+                    <tr key={item.id} onClick={() => setCredentialForm({
+                      slug: item.slug,
+                      auth_mode: item.auth_mode,
+                      public_config: stringify(item.public_config || {}),
+                      secrets: '',
+                    })}>
                       <td>{item.slug}</td>
                       <td>{item.auth_mode}</td>
                       <td><span className={`status-tag ${statusClass(item.status)}`}>{item.status}</span></td>
@@ -385,7 +404,15 @@ export default function PlatformConnectorsPage() {
                 </thead>
                 <tbody>
                   {actions.map((item) => (
-                    <tr key={item.id} className={actionForm.slug === item.slug ? 'table-row-selected' : ''} onClick={() => setActionForm((prev) => ({ ...prev, slug: item.slug, method: item.method, path_template: item.path_template, credential_id: item.credential_id || '' }))}>
+                    <tr key={item.id} className={actionForm.slug === item.slug ? 'table-row-selected' : ''} onClick={() => setActionForm({
+                      slug: item.slug,
+                      method: item.method,
+                      path_template: item.path_template,
+                      credential_id: item.credential_id || '',
+                      input_schema: stringify(item.input_schema || {}),
+                      request_mapping: stringify(item.request_mapping || {}),
+                      response_mapping: stringify(item.response_mapping || {}),
+                    })}>
                       <td>{item.slug}</td>
                       <td><code>{item.method} {item.path_template}</code></td>
                       <td><span className={`status-tag ${statusClass(item.status)}`}>{item.status}</span></td>
@@ -409,7 +436,7 @@ export default function PlatformConnectorsPage() {
               <label className="platform-form-span-2">Request Mapping<textarea rows={4} value={actionForm.request_mapping} onChange={(event) => setActionForm((prev) => ({ ...prev, request_mapping: event.target.value }))} /></label>
               <label className="platform-form-span-2">Response Mapping<textarea rows={3} value={actionForm.response_mapping} onChange={(event) => setActionForm((prev) => ({ ...prev, response_mapping: event.target.value }))} /></label>
               <div className="platform-form-actions platform-form-span-2">
-                <button className="btn btn-sm" type="submit" disabled={saving === 'action'}>{saving === 'action' ? '保存中...' : '创建 Action'}</button>
+                <button className="btn btn-sm" type="submit" disabled={saving === 'action'}>{saving === 'action' ? '保存中...' : '保存 Action'}</button>
               </div>
             </form>
           </section>
