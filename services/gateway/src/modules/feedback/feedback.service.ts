@@ -11,6 +11,7 @@ import { PrismaClient } from '@prisma/client';
 import { PRISMA_CLIENT } from '../../config/database.module';
 import { AiPointsService } from '../ai-chat/ai-points.service';
 import { RedeemService } from '../redeem/redeem.service';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 
 type FeedbackStatus = 'pending' | 'triaged' | 'in_progress' | 'resolved' | 'closed' | 'useless' | 'thanks' | 'useful';
 type FeedbackAction = 'useless' | 'thanks' | 'useful';
@@ -114,6 +115,7 @@ export class FeedbackService implements OnModuleInit {
     @Inject(PRISMA_CLIENT) private readonly prisma: PrismaClient,
     private readonly aiPointsService: AiPointsService,
     private readonly redeemService: RedeemService,
+    private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
   async onModuleInit() {
@@ -168,10 +170,30 @@ export class FeedbackService implements OnModuleInit {
       this.cleanText(payload?.category, 64),
       this.normalizePriority(payload?.priority),
     ) as Promise<FeedbackRow[]>);
+    const created = rows[0];
+
+    await this.adminNotifications.emit({
+      app_id: app.id,
+      event_type: hasBugLog ? 'feedback.bug_report.created' : 'feedback.created',
+      severity: hasBugLog ? 'high' : this.feedbackSeverity(created.priority),
+      source_module: 'feedback',
+      source_id: created.id,
+      title: hasBugLog ? `故障反馈：${created.title}` : `新用户反馈：${created.title}`,
+      message: created.content,
+      dedupe_key: `feedback:${created.id}`,
+      payload: {
+        feedback_id: created.id,
+        user_id: userId,
+        priority: created.priority,
+        category: created.category,
+        has_bug_report: hasBugLog,
+        context: normalizedContext,
+      },
+    });
 
     return {
       message: '反馈已提交，感谢你的建议',
-      item: this.serializeFeedbackRow(rows[0]),
+      item: this.serializeFeedbackRow(created),
     };
   }
 
@@ -907,6 +929,13 @@ export class FeedbackService implements OnModuleInit {
       return input as FeedbackPriority;
     }
     return 'normal';
+  }
+
+  private feedbackSeverity(priority: FeedbackPriority) {
+    if (priority === 'urgent') return 'critical';
+    if (priority === 'high') return 'high';
+    if (priority === 'low') return 'info';
+    return 'warning';
   }
 
   private normalizePriorityFilter(value: unknown): FeedbackPriority | '' {

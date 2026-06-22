@@ -56,9 +56,10 @@ import AppLogsPanel from '@/pages/platform/components/AppLogsPanel';
 import TenantBuildDataPanel from '@/pages/platform/components/TenantBuildDataPanel';
 import TenantApiDocsPanel from '@/pages/platform/components/TenantApiDocsPanel';
 import TenantAnalyticsPanel from '@/pages/platform/components/TenantAnalyticsPanel';
+import AdminNotificationsPanel from '@/pages/platform/components/AdminNotificationsPanel';
 
 type Message = { type: 'success' | 'error'; text: string } | null;
-type WorkspaceSection = 'overview' | 'build-data' | 'analytics' | 'ai-usage' | 'logs' | 'api-docs' | 'developers' | 'admins' | 'ai-routing' | 'site' | 'email' | 'feedback' | 'acquisition' | 'redeem';
+type WorkspaceSection = 'overview' | 'build-data' | 'analytics' | 'ai-usage' | 'logs' | 'api-docs' | 'developers' | 'admins' | 'ai-routing' | 'site' | 'email' | 'notifications' | 'feedback' | 'acquisition' | 'redeem';
 type RedeemSubPage = 'products' | 'product-create' | 'orders' | 'code-batches' | 'code-create' | 'codes' | 'redemptions';
 type ManualGrantIdentityType = 'email' | 'user_id' | 'phone';
 type AppModelCapabilityFilter = 'ALL' | PlatformAppAiModelRouteItem['model']['capability'] | 'voice_clone';
@@ -148,6 +149,7 @@ const WORKSPACE_NAV: Array<{ key: WorkspaceSection; label: string; desc: string 
   { key: 'admins', label: '管理员管理', desc: '账号、密码、权限' },
   { key: 'ai-routing', label: 'AI 模型路由', desc: '基于全局源做租户级覆盖' },
   { key: 'email', label: '邮件营销', desc: '发邮件批次与触达名单' },
+  { key: 'notifications', label: '通知', desc: '渠道、规则与投递' },
   { key: 'feedback', label: '用户反馈', desc: '反馈处理、积分奖励' },
   { key: 'acquisition', label: '用户来源', desc: '来源选项与提交记录' },
   { key: 'redeem', label: '产品与兑换', desc: '产品、兑换码与分发运营' },
@@ -803,6 +805,7 @@ export default function TenantWorkspace({ appIdOverride }: TenantWorkspaceProps)
   const canManagePlatformAppSettings = runtimeContext.isPlatformPortal && isAppSuperAdmin;
   const hasAppPermission = (key: string) => isAppSuperAdmin || Boolean(adminAccess?.page_permissions?.includes(key));
   const canUseRedeemRead = hasAppPermission('app_redeem_read') || hasAppPermission('app_redeem_products_manage');
+  const canManageNotifications = hasAppPermission('app_notifications_manage');
   const visibleWorkspaceNav = useMemo(() => {
     if (!adminAccess) return WORKSPACE_NAV.filter((item) => item.key === 'overview');
     return WORKSPACE_NAV.filter((item) => {
@@ -816,12 +819,13 @@ export default function TenantWorkspace({ appIdOverride }: TenantWorkspaceProps)
       if (item.key === 'admins') return isAppSuperAdmin;
       if (item.key === 'ai-routing') return canManagePlatformAppSettings;
       if (item.key === 'email') return hasAppPermission('app_email_manage');
+      if (item.key === 'notifications') return canManageNotifications;
       if (item.key === 'feedback') return hasAppPermission('app_feedback_manage');
       if (item.key === 'acquisition') return hasAppPermission('app_acquisition_manage');
       if (item.key === 'redeem') return hasAppPermission('app_redeem_read') || hasAppPermission('app_redeem_products_manage');
       return false;
     });
-  }, [adminAccess, isAppSuperAdmin, canManagePlatformAppSettings]);
+  }, [adminAccess, isAppSuperAdmin, canManagePlatformAppSettings, canManageNotifications]);
 
   const defaultModelSlotByKey = useMemo(() => {
     const map = new Map<PlatformAppAiDefaultModelSlotKey, PlatformAppAiDefaultModelSlotItem>();
@@ -6153,6 +6157,7 @@ const agents = await opg.agents.list();`}</pre>
           {activeSection === 'ai-routing' && renderAiRouting()}
           {activeSection === 'site' && renderSite()}
           {activeSection === 'email' && renderEmail()}
+          {activeSection === 'notifications' && <AdminNotificationsPanel appId={appId} compact />}
           {activeSection === 'feedback' && renderFeedback()}
           {activeSection === 'acquisition' && renderAcquisition()}
           {activeSection === 'redeem' && renderRedeem()}

@@ -35,6 +35,11 @@ export const PLATFORM_APP_ADMIN_PERMISSION_CATALOG = [
     description: '管理应用邮件配置、联系人与批次',
   },
   {
+    key: 'app_notifications_manage',
+    name: '通知',
+    description: '管理通知渠道、规则和投递记录',
+  },
+  {
     key: 'app_feedback_manage',
     name: '用户反馈',
     description: '查看和处理用户反馈工单',

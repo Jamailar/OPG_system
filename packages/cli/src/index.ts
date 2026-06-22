@@ -827,6 +827,75 @@ async function runPlatformCommand(commandArgs: string[]) {
     }
   }
 
+  if (resource === 'notifications' || resource === 'notification') {
+    const subject = action;
+    const subAction = positionalArgs(commandArgs.slice(2))[0] || 'list';
+    const appId = flags.appId || flags['app-id'] || undefined;
+    const channelId = flags.channelId || flags['channel-id'] || '';
+    if (subject === 'catalog') {
+      printJson(await client.notifications.catalog(appId));
+      return;
+    }
+    if (subject === 'channels' || subject === 'channel') {
+      if (subAction === 'list') {
+        printJson(await client.notifications.channels.list(appId, parseQueryPayload(flags)));
+        return;
+      }
+      if (subAction === 'create') {
+        const payload = parseJsonPayload(flags) as Record<string, unknown>;
+        if (appId) payload.app_id = appId;
+        printJson(await client.notifications.channels.create(payload));
+        return;
+      }
+      if (subAction === 'update') {
+        if (!channelId) throw new Error('Missing channel id. Use: opg platform notifications channels update --channel-id <id> --json {...}');
+        const payload = parseJsonPayload(flags) as Record<string, unknown>;
+        if (appId) payload.app_id = appId;
+        printJson(await client.notifications.channels.update(channelId, payload));
+        return;
+      }
+      if (subAction === 'delete' || subAction === 'remove') {
+        if (!channelId) throw new Error('Missing channel id. Use: opg platform notifications channels delete --channel-id <id>');
+        printJson(await client.notifications.channels.delete(channelId, appId));
+        return;
+      }
+      if (subAction === 'test') {
+        const id = channelId || flags.id || '';
+        if (!id) throw new Error('Missing channel id. Use: opg platform notifications channels test --channel-id <id>');
+        const payload = flags.json ? parseJsonPayload(flags) as Record<string, unknown> : {};
+        if (appId) payload.app_id = appId;
+        printJson(await client.notifications.channels.test(id, payload));
+        return;
+      }
+    }
+    if (subject === 'rules' || subject === 'rule') {
+      if (subAction === 'list') {
+        printJson(await client.notifications.rules.list(appId));
+        return;
+      }
+      if (subAction === 'update') {
+        printJson(await client.notifications.rules.update(appId, parseJsonPayload(flags) as Record<string, unknown>));
+        return;
+      }
+    }
+    if (subject === 'events' || subject === 'event') {
+      if (subAction === 'list') {
+        const query = parseQueryPayload(flags);
+        if (appId) query.app_id = appId;
+        printJson(await client.notifications.events.list(query));
+        return;
+      }
+    }
+    if (subject === 'deliveries' || subject === 'delivery') {
+      if (subAction === 'list') {
+        const query = parseQueryPayload(flags);
+        if (appId) query.app_id = appId;
+        printJson(await client.notifications.deliveries.list(query));
+        return;
+      }
+    }
+  }
+
   if (resource === 'analytics') {
     const appId = requirePlatformAppId(flags);
     const query = parseQueryPayload(flags);
@@ -1627,6 +1696,102 @@ async function startMcpServer() {
   );
 
   registerTool(
+    'opg_platform_app_notification_channels_list',
+    {
+      title: 'List OPG App Notification Channels',
+      description: 'List Feishu robot and email admin notification channels for a tenant app.',
+      inputSchema: { appId: z.string().min(1), channelType: z.string().optional() },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appId, channelType }: any) => toToolResult(await platformClient.notifications.channels.list(appId, {
+      channel_type: channelType,
+    })),
+  );
+
+  registerTool(
+    'opg_platform_app_notification_channel_create',
+    {
+      title: 'Create OPG App Notification Channel',
+      description: 'Create one tenant app admin notification channel. Use channel_type FEISHU_ROBOT or EMAIL.',
+      inputSchema: {
+        appId: z.string().min(1),
+        payload: z.record(z.unknown()),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ appId, payload }: any) => toToolResult(await platformClient.notifications.channels.create({
+      ...payload,
+      app_id: appId,
+    })),
+  );
+
+  registerTool(
+    'opg_platform_app_notification_channel_test',
+    {
+      title: 'Test OPG App Notification Channel',
+      description: 'Send a test admin notification through one tenant app channel.',
+      inputSchema: {
+        appId: z.string().min(1),
+        channelId: z.string().min(1),
+        payload: z.record(z.unknown()).optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ appId, channelId, payload }: any) => toToolResult(await platformClient.notifications.channels.test(channelId, {
+      ...(payload || {}),
+      app_id: appId,
+    })),
+  );
+
+  registerTool(
+    'opg_platform_app_notification_rules_list',
+    {
+      title: 'List OPG App Notification Rules',
+      description: 'List tenant app admin notification rules and event catalog.',
+      inputSchema: { appId: z.string().min(1) },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appId }: any) => toToolResult(await platformClient.notifications.rules.list(appId)),
+  );
+
+  registerTool(
+    'opg_platform_app_notification_rules_update',
+    {
+      title: 'Update OPG App Notification Rules',
+      description: 'Replace tenant app admin notification rules. Payload should include items.',
+      inputSchema: {
+        appId: z.string().min(1),
+        payload: z.record(z.unknown()),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ appId, payload }: any) => toToolResult(await platformClient.notifications.rules.update(appId, payload)),
+  );
+
+  registerTool(
+    'opg_platform_app_notification_events_list',
+    {
+      title: 'List OPG App Notification Events',
+      description: 'List recent tenant app admin notification events.',
+      inputSchema: {
+        appId: z.string().min(1),
+        eventType: z.string().optional(),
+        severity: z.string().optional(),
+        status: z.string().optional(),
+        limit: z.number().int().min(1).max(200).default(50),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appId, eventType, severity, status, limit }: any) => toToolResult(await platformClient.notifications.events.list({
+      app_id: appId,
+      event_type: eventType,
+      severity,
+      status,
+      limit,
+    })),
+  );
+
+  registerTool(
     'opg_platform_app_analytics_overview',
     {
       title: 'Get OPG App Analytics Overview',
@@ -1724,6 +1889,96 @@ async function startMcpServer() {
       status,
       q,
     })),
+  );
+
+  registerTool(
+    'opg_platform_app_admins_list',
+    {
+      title: 'List OPG App Admins',
+      description: 'List tenant app admins with effective permissions, role assignments, permission overrides, and the app admin role catalog.',
+      inputSchema: {
+        appId: z.string().min(1),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appId }: any) => toToolResult(await platformClient.apps.admins.list(appId)),
+  );
+
+  registerTool(
+    'opg_platform_app_admin_permissions_me',
+    {
+      title: 'Get Current OPG App Admin Permissions',
+      description: 'Read the current platform admin permissions for one tenant app, including permission and role catalogs.',
+      inputSchema: {
+        appId: z.string().min(1),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appId }: any) => toToolResult(await platformClient.apps.admins.myPermissions(appId)),
+  );
+
+  registerTool(
+    'opg_platform_app_admin_upsert',
+    {
+      title: 'Create Or Update OPG App Admin',
+      description: 'Create or update a tenant app admin. Use role_keys for templates and permission_overrides for extra granular permissions.',
+      inputSchema: {
+        appId: z.string().min(1),
+        payload: z.record(z.unknown()).describe('Payload accepted by POST /platform-admin/apps/{app_id}/admins. For ADMIN use role_keys and permission_overrides.'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appId, payload }: any) => toToolResult(await platformClient.apps.admins.create(appId, payload)),
+  );
+
+  registerTool(
+    'opg_platform_app_admin_permissions_update',
+    {
+      title: 'Update OPG App Admin Permissions',
+      description: 'Replace role template assignments and extra granular permission overrides for one tenant app admin.',
+      inputSchema: {
+        appId: z.string().min(1),
+        adminUserId: z.string().min(1),
+        roleKeys: z.array(z.string()).optional(),
+        permissionOverrides: z.array(z.string()).optional(),
+        pagePermissions: z.array(z.string()).optional().describe('Legacy fallback. Prefer roleKeys plus permissionOverrides.'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ appId, adminUserId, roleKeys, permissionOverrides, pagePermissions }: any) => toToolResult(await platformClient.apps.admins.updatePermissions(appId, adminUserId, {
+      role_keys: roleKeys,
+      permission_overrides: permissionOverrides,
+      page_permissions: pagePermissions,
+    })),
+  );
+
+  registerTool(
+    'opg_platform_app_admin_status_update',
+    {
+      title: 'Update OPG App Admin Status',
+      description: 'Enable or disable a tenant app admin account.',
+      inputSchema: {
+        appId: z.string().min(1),
+        adminUserId: z.string().min(1),
+        isActive: z.boolean(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ appId, adminUserId, isActive }: any) => toToolResult(await platformClient.apps.admins.updateStatus(appId, adminUserId, { is_active: isActive })),
+  );
+
+  registerTool(
+    'opg_platform_app_admin_remove',
+    {
+      title: 'Remove OPG App Admin',
+      description: 'Remove a regular tenant app admin assignment.',
+      inputSchema: {
+        appId: z.string().min(1),
+        adminUserId: z.string().min(1),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ appId, adminUserId }: any) => toToolResult(await platformClient.apps.admins.remove(appId, adminUserId)),
   );
 
   registerTool(
@@ -2901,6 +3156,13 @@ Usage:
   opg platform feedbacks update --app-id <id> --feedback-id <id> --json '{...}'
   opg platform feedbacks comment --app-id <id> --feedback-id <id> --json '{...}'
   opg platform feedbacks review --app-id <id> --feedback-id <id> --json '{...}'
+  opg platform notifications channels list --app-id <id>
+  opg platform notifications channels create --app-id <id> --json '{...}'
+  opg platform notifications channels test --app-id <id> --channel-id <id>
+  opg platform notifications rules list --app-id <id>
+  opg platform notifications rules update --app-id <id> --json '{...}'
+  opg platform notifications events list --app-id <id>
+  opg platform notifications deliveries list --app-id <id>
   opg platform analytics business --app-id <id> --days 30
   opg platform analytics overview --app-id <id> --days 30
   opg platform analytics growth --app-id <id> --days 30

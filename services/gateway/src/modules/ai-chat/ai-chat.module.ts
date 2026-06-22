@@ -26,9 +26,10 @@ import { OutboundProxyModule } from '../outbound-proxy/outbound-proxy.module';
 import { RuntimeSettingsModule } from '../runtime-settings/runtime-settings.module';
 import { PlatformAdminAccessGuard } from '../../common/guards/platform-admin-access.guard';
 import { DeveloperAuthorizationModule } from '../developer-sdk/developer-authorization.module';
+import { AdminNotificationsModule } from '../admin-notifications/admin-notifications.module';
 
 @Module({
-  imports: [forwardRef(() => AuthModule), AppApiKeysModule, UploadModule, OutboundProxyModule, RuntimeSettingsModule, DeveloperAuthorizationModule],
+  imports: [forwardRef(() => AuthModule), AppApiKeysModule, UploadModule, OutboundProxyModule, RuntimeSettingsModule, DeveloperAuthorizationModule, AdminNotificationsModule],
   controllers: [AiChatController, AiOpenAiController, AiGeminiController, AiVoicesController, AiVoicesAdminController],
   providers: [
     AiChatService,

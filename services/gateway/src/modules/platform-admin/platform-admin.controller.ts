@@ -14,6 +14,7 @@ import { PlatformObservabilityService } from '../observability/platform-observab
 import { DeveloperAuthorizationService } from '../developer-sdk/developer-authorization.service';
 import { PlatformTasksService } from '../platform-tasks/platform-tasks.service';
 import { PlatformTaskStatus } from '../platform-tasks/platform-tasks.types';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 
 @ApiTags('PlatformAdmin')
 @Controller(tenantControllerPaths('platform-admin', true))
@@ -30,6 +31,7 @@ export class PlatformAdminController {
     private readonly platformObservabilityService: PlatformObservabilityService,
     private readonly developerAuthorizationService: DeveloperAuthorizationService,
     private readonly platformTasksService: PlatformTasksService,
+    private readonly adminNotificationsService: AdminNotificationsService,
   ) {}
 
   @Get('apps')
@@ -48,6 +50,67 @@ export class PlatformAdminController {
   @ApiOperation({ summary: '更新平台运行时设置' })
   async updateRuntimeSettings(@Req() req: any, @Body() body: any) {
     return this.runtimeSettingsService.updateAdminRuntimeSettings(req.user.id, body || {});
+  }
+
+
+  @Get('notifications/catalog')
+  @ApiOperation({ summary: '管理员通知事件目录' })
+  async listNotificationEventCatalog() {
+    return this.adminNotificationsService.eventCatalog();
+  }
+
+  @Get('notifications/channels')
+  @ApiOperation({ summary: '管理员通知渠道列表' })
+  async listNotificationChannels(@Query('app_id') appId?: string, @Query('channel_type') channelType?: string) {
+    return this.adminNotificationsService.listChannels({ app_id: appId, channel_type: channelType });
+  }
+
+  @Post('notifications/channels')
+  @ApiOperation({ summary: '创建管理员通知渠道' })
+  async createNotificationChannel(@Req() req: any, @Body() body: any) {
+    return this.adminNotificationsService.createChannel(req.user?.id, body || {});
+  }
+
+  @Patch('notifications/channels/:channel_id')
+  @ApiOperation({ summary: '更新管理员通知渠道' })
+  async updateNotificationChannel(@Param('channel_id') channelId: string, @Body() body: any) {
+    return this.adminNotificationsService.updateChannel(channelId, body || {});
+  }
+
+  @Delete('notifications/channels/:channel_id')
+  @ApiOperation({ summary: '删除管理员通知渠道' })
+  async deleteNotificationChannel(@Param('channel_id') channelId: string) {
+    return this.adminNotificationsService.deleteChannel(channelId);
+  }
+
+  @Post('notifications/channels/:channel_id/test')
+  @ApiOperation({ summary: '测试管理员通知渠道' })
+  async testNotificationChannel(@Param('channel_id') channelId: string, @Body() body: any) {
+    return this.adminNotificationsService.testChannel(channelId, body || {});
+  }
+
+  @Get('notifications/rules')
+  @ApiOperation({ summary: '管理员通知规则列表' })
+  async listNotificationRules(@Query('app_id') appId?: string) {
+    return this.adminNotificationsService.listRules(appId || null);
+  }
+
+  @Put('notifications/rules')
+  @ApiOperation({ summary: '更新管理员通知规则' })
+  async updateNotificationRules(@Body() body: any, @Query('app_id') appId?: string) {
+    return this.adminNotificationsService.updateRules(appId || null, body || {});
+  }
+
+  @Get('notifications/events')
+  @ApiOperation({ summary: '管理员通知事件列表' })
+  async listNotificationEvents(@Query() query: any) {
+    return this.adminNotificationsService.listEvents(query || {});
+  }
+
+  @Get('notifications/deliveries')
+  @ApiOperation({ summary: '管理员通知投递列表' })
+  async listNotificationDeliveries(@Query() query: any) {
+    return this.adminNotificationsService.listDeliveries(query || {});
   }
 
   @Get('observability/runtime')
@@ -961,6 +1024,67 @@ export class PlatformAdminController {
   @ApiOperation({ summary: '更新租户邮件配置' })
   async updateAppEmailSettings(@Param('app_id') appId: string, @Body() body: any) {
     return this.emailDeliveryService.updateAppEmailSettings(appId, body || {});
+  }
+
+
+  @Get('apps/:app_id/notifications/catalog')
+  @ApiOperation({ summary: '租户管理员通知事件目录' })
+  async listAppNotificationEventCatalog() {
+    return this.adminNotificationsService.eventCatalog();
+  }
+
+  @Get('apps/:app_id/notifications/channels')
+  @ApiOperation({ summary: '租户管理员通知渠道列表' })
+  async listAppNotificationChannels(@Param('app_id') appId: string, @Query('channel_type') channelType?: string) {
+    return this.adminNotificationsService.listChannels({ app_id: appId, channel_type: channelType });
+  }
+
+  @Post('apps/:app_id/notifications/channels')
+  @ApiOperation({ summary: '创建租户管理员通知渠道' })
+  async createAppNotificationChannel(@Req() req: any, @Param('app_id') appId: string, @Body() body: any) {
+    return this.adminNotificationsService.createChannel(req.user?.id, body || {}, appId);
+  }
+
+  @Patch('apps/:app_id/notifications/channels/:channel_id')
+  @ApiOperation({ summary: '更新租户管理员通知渠道' })
+  async updateAppNotificationChannel(@Param('channel_id') channelId: string, @Body() body: any) {
+    return this.adminNotificationsService.updateChannel(channelId, body || {});
+  }
+
+  @Delete('apps/:app_id/notifications/channels/:channel_id')
+  @ApiOperation({ summary: '删除租户管理员通知渠道' })
+  async deleteAppNotificationChannel(@Param('channel_id') channelId: string) {
+    return this.adminNotificationsService.deleteChannel(channelId);
+  }
+
+  @Post('apps/:app_id/notifications/channels/:channel_id/test')
+  @ApiOperation({ summary: '测试租户管理员通知渠道' })
+  async testAppNotificationChannel(@Param('channel_id') channelId: string, @Body() body: any) {
+    return this.adminNotificationsService.testChannel(channelId, body || {});
+  }
+
+  @Get('apps/:app_id/notifications/rules')
+  @ApiOperation({ summary: '租户管理员通知规则列表' })
+  async listAppNotificationRules(@Param('app_id') appId: string) {
+    return this.adminNotificationsService.listRules(appId);
+  }
+
+  @Put('apps/:app_id/notifications/rules')
+  @ApiOperation({ summary: '更新租户管理员通知规则' })
+  async updateAppNotificationRules(@Param('app_id') appId: string, @Body() body: any) {
+    return this.adminNotificationsService.updateRules(appId, body || {});
+  }
+
+  @Get('apps/:app_id/notifications/events')
+  @ApiOperation({ summary: '租户管理员通知事件列表' })
+  async listAppNotificationEvents(@Param('app_id') appId: string, @Query() query: any) {
+    return this.adminNotificationsService.listEvents({ ...(query || {}), app_id: appId });
+  }
+
+  @Get('apps/:app_id/notifications/deliveries')
+  @ApiOperation({ summary: '租户管理员通知投递列表' })
+  async listAppNotificationDeliveries(@Param('app_id') appId: string, @Query() query: any) {
+    return this.adminNotificationsService.listDeliveries({ ...(query || {}), app_id: appId });
   }
 
   @Get('apps/:app_id/email/contacts')

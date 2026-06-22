@@ -15,6 +15,7 @@ type PlatformNavIconKey =
   | 'apps'
   | 'runtime'
   | 'jobs'
+  | 'notifications'
   | 'login'
   | 'proxy'
   | 'payment'
@@ -64,6 +65,13 @@ const navItems = [
     label: '任务',
     desc: '后台任务与工作器',
     path: '/platform-admin/jobs',
+  },
+  {
+    key: 'notifications',
+    icon: 'notifications',
+    label: '通知',
+    desc: '告警渠道与投递',
+    path: '/platform-admin/notifications',
   },
   {
     key: 'login-credentials',
@@ -134,6 +142,7 @@ const platformNavIconPaths: Record<PlatformNavIconKey, string[]> = {
   apps: ['M12 4 4 8l8 4 8-4-8-4Z', 'M4 12l8 4 8-4', 'M4 16l8 4 8-4'],
   runtime: ['M5 5h14v5H5V5Z', 'M5 14h14v5H5v-5Z', 'M8 7.5h.01M8 16.5h.01M11 7.5h5M11 16.5h5'],
   jobs: ['M7 6h10', 'M7 12h10', 'M7 18h10', 'M4 6h.01', 'M4 12h.01', 'M4 18h.01'],
+  notifications: ['M18 9a6 6 0 0 0-12 0c0 7-2 7-2 8h16c0-1-2-1-2-8Z', 'M10 20h4', 'M9 4a3 3 0 0 1 6 0'],
   login: ['M15 7.5V6a3 3 0 0 0-6 0v1.5', 'M7 10h10a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 17 19H7a1.5 1.5 0 0 1-1.5-1.5v-6A1.5 1.5 0 0 1 7 10Z', 'M12 14v2'],
   proxy: ['M8 8h8a4 4 0 0 1 0 8h-2', 'M16 16H8a4 4 0 0 1 0-8h2', 'M9 12h6'],
   payment: ['M4 7.5A1.5 1.5 0 0 1 5.5 6h13A1.5 1.5 0 0 1 20 7.5v9A1.5 1.5 0 0 1 18.5 18h-13A1.5 1.5 0 0 1 4 16.5v-9Z', 'M4 10h16', 'M7 15h4'],

@@ -116,16 +116,65 @@ await platform.apps.feedbacks.addComment(appId, feedbackId, {
   is_internal: false,
 });
 
+const channels = await platform.notifications.channels.list(appId);
+
+const createdChannel = await platform.notifications.channels.create({
+  app_id: appId,
+  channel_type: "EMAIL",
+  name: "Ops Email",
+  recipients: ["ops@example.com"],
+});
+
+await platform.notifications.channels.test(String((createdChannel as any).item.id), {
+  app_id: appId,
+});
+
+await platform.notifications.rules.update(appId, {
+  items: [
+    {
+      event_type: "feedback.bug_report.created",
+      enabled: true,
+      min_severity: "high",
+      channel_ids: [],
+      dedupe_window_seconds: 600,
+      aggregation_window_seconds: 0,
+    },
+  ],
+});
+
+const notificationEvents = await platform.notifications.events.list({ app_id: appId, limit: 20 });
+const notificationDeliveries = await platform.notifications.deliveries.list({ app_id: appId, limit: 20 });
+
 const users = await platform.apps.analytics.users(appId, { days: 30 });
 const aiLogs = await platform.apps.aiUsage.logs(appId, { days: 7 });
 const orders = await platform.apps.payments.orders(appId, { page: 1 });
+
+const adminAccess = await platform.apps.admins.myPermissions(appId);
+const admins = await platform.apps.admins.list(appId);
+
+await platform.apps.admins.create(appId, {
+  email: "ops@example.com",
+  password: "change-me-min-8",
+  admin_type: "ADMIN",
+  role_keys: ["operations"],
+  permission_overrides: ["app.orders.refund"],
+});
+
+await platform.apps.admins.updatePermissions(appId, String((admins as any).items[0].id), {
+  role_keys: ["support"],
+  permission_overrides: ["app.feedback.reward"],
+});
 ```
 
 Available app data namespaces include `agents`, `feedbacks`, `analytics`,
 `aiUsage`, `payments`, `email`, `site`, `redeem`, `admins`, `schema`,
 `functions`, `workflows`, `blocks`, `connectors`, and `build`.
 
-Platform-wide namespaces include `observability`, `tasks`,
+App admin RBAC uses role templates plus granular permission overrides. Prefer
+`role_keys` and `permission_overrides`; `page_permissions` is kept only for
+legacy callers.
+
+Platform-wide namespaces include `observability`, `notifications`, `tasks`,
 `developerAuthorizations`, `storageProviders`, `smtpProviders`,
 `integrationApiKeys`, `payments`, `sms`, `oauth`, `email`, `proxies`, `ai`,
 and `agents`.

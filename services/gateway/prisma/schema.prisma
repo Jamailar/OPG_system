@@ -221,6 +221,82 @@ model AdminPermissionGroup {
   @@map("admin_permission_groups")
 }
 
+model AdminNotificationChannel {
+  id              String   @id @default(uuid())
+  appId           String?  @map("app_id")
+  channelType     String   @map("channel_type") @db.VarChar(32)
+  name            String   @db.VarChar(120)
+  status          String   @default("ACTIVE") @db.VarChar(16)
+  configJson      Json     @default("{}") @map("config_json")
+  secretCiphertext String? @map("secret_ciphertext")
+  createdByUserId String?  @map("created_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([appId, status, updatedAt])
+  @@index([channelType, status, updatedAt])
+  @@map("admin_notification_channels")
+}
+
+model AdminNotificationRule {
+  id                       String   @id @default(uuid())
+  appId                    String?  @map("app_id")
+  eventType                String   @map("event_type") @db.VarChar(120)
+  minSeverity              String   @default("info") @map("min_severity") @db.VarChar(16)
+  channelIdsJson           Json     @default("[]") @map("channel_ids_json")
+  enabled                  Boolean  @default(true)
+  dedupeWindowSeconds      Int      @default(600) @map("dedupe_window_seconds")
+  aggregationWindowSeconds Int      @default(0) @map("aggregation_window_seconds")
+  quietHoursJson           Json     @default("{}") @map("quiet_hours_json")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  @@index([appId, enabled, eventType])
+  @@map("admin_notification_rules")
+}
+
+model AdminNotificationEvent {
+  id           String   @id @default(uuid())
+  appId        String?  @map("app_id")
+  eventType    String   @map("event_type") @db.VarChar(120)
+  severity     String   @default("info") @db.VarChar(16)
+  title        String   @db.VarChar(180)
+  message      String?
+  sourceModule String?  @map("source_module") @db.VarChar(80)
+  sourceId     String?  @map("source_id") @db.VarChar(160)
+  dedupeKey    String?  @map("dedupe_key") @db.VarChar(180)
+  payloadJson  Json     @default("{}") @map("payload_json")
+  status       String   @default("recorded") @db.VarChar(32)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([appId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([status, createdAt])
+  @@index([appId, eventType, dedupeKey, createdAt])
+  @@map("admin_notification_events")
+}
+
+model AdminNotificationDelivery {
+  id                   String    @id @default(uuid())
+  eventId              String    @map("event_id")
+  channelId            String    @map("channel_id")
+  status               String    @default("pending") @db.VarChar(32)
+  attempts             Int       @default(0)
+  nextRetryAt          DateTime? @map("next_retry_at")
+  providerResponseJson Json      @default("{}") @map("provider_response_json")
+  errorMessage         String?   @map("error_message")
+  sentAt               DateTime? @map("sent_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  @@unique([eventId, channelId])
+  @@index([status, nextRetryAt, createdAt])
+  @@index([channelId, createdAt])
+  @@index([eventId])
+  @@map("admin_notification_deliveries")
+}
+
 model UserIdentity {
   id              String   @id @default(uuid())
   appId           String   @map("app_id")

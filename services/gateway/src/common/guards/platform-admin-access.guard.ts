@@ -145,6 +145,9 @@ export class PlatformAdminAccessGuard implements CanActivate {
     if (path.match(/^\/apps\/[^/]+\/email(?:\/|$)/)) {
       return { kind: 'app-permission', permissions: ['app_email_manage'] };
     }
+    if (path.match(/^\/apps\/[^/]+\/notifications(?:\/|$)/)) {
+      return { kind: 'app-permission', permissions: ['app_notifications_manage'] };
+    }
     if (path.match(/^\/apps\/[^/]+\/site(?:\/|$)/)) {
       return { kind: 'app-permission', permissions: ['app_site_manage'] };
     }

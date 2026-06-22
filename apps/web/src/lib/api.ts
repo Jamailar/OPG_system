@@ -874,6 +874,91 @@ export interface PlatformEmailCampaignItem {
   updated_at?: string | null;
 }
 
+export type PlatformNotificationChannelType = 'FEISHU_ROBOT' | 'EMAIL';
+export type PlatformNotificationSeverity = 'info' | 'warning' | 'high' | 'critical';
+
+export interface PlatformNotificationEventCatalogItem {
+  event_type: string;
+  label: string;
+  min_severity: PlatformNotificationSeverity;
+}
+
+export interface PlatformNotificationChannelItem {
+  id: string;
+  app_id?: string | null;
+  app_slug?: string | null;
+  app_name?: string | null;
+  channel_type: PlatformNotificationChannelType;
+  name: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'DELETED' | string;
+  config?: Record<string, any>;
+  secret_configured?: boolean;
+  created_by_user_id?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface PlatformNotificationRuleItem {
+  id?: string;
+  app_id?: string | null;
+  event_type: string;
+  min_severity: PlatformNotificationSeverity;
+  channel_ids: string[];
+  enabled: boolean;
+  dedupe_window_seconds: number;
+  aggregation_window_seconds: number;
+  quiet_hours?: Record<string, any>;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface PlatformNotificationEventItem {
+  id: string;
+  app_id?: string | null;
+  app_slug?: string | null;
+  app_name?: string | null;
+  event_type: string;
+  severity: PlatformNotificationSeverity | string;
+  title: string;
+  message?: string | null;
+  source_module?: string | null;
+  source_id?: string | null;
+  dedupe_key?: string | null;
+  payload?: Record<string, any>;
+  status: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface PlatformNotificationDeliveryItem {
+  id: string;
+  event_id: string;
+  channel_id: string;
+  app_id?: string | null;
+  event_type?: string | null;
+  severity?: string | null;
+  title?: string | null;
+  channel_type?: PlatformNotificationChannelType | string;
+  channel_name?: string | null;
+  status: string;
+  attempts: number;
+  error_message?: string | null;
+  sent_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export type PlatformNotificationChannelInput = {
+  app_id?: string | null;
+  channel_type: PlatformNotificationChannelType;
+  name: string;
+  status?: 'ACTIVE' | 'INACTIVE';
+  webhook_url?: string;
+  secret?: string;
+  recipients?: string[];
+  sender_id?: string | null;
+};
+
 export interface PlatformWechatOpenAppItem {
   id: string;
   name: string;
@@ -3014,6 +3099,106 @@ export const platformApi = {
   testEmailProvider: async (providerId: string) => {
     const response = await apiClient.getClient().post(`/platform-admin/email/providers/${providerId}/test`);
     return response.data as { ok: boolean };
+  },
+
+  listNotificationEventCatalog: async () => {
+    const response = await apiClient.getClient().get('/platform-admin/notifications/catalog');
+    return response.data as { items: PlatformNotificationEventCatalogItem[] };
+  },
+
+  listNotificationChannels: async (params?: { app_id?: string; channel_type?: PlatformNotificationChannelType }) => {
+    const response = await apiClient.getClient().get('/platform-admin/notifications/channels', { params });
+    return response.data as { items: PlatformNotificationChannelItem[] };
+  },
+
+  createNotificationChannel: async (payload: PlatformNotificationChannelInput) => {
+    const response = await apiClient.getClient().post('/platform-admin/notifications/channels', payload);
+    return response.data as { item: PlatformNotificationChannelItem };
+  },
+
+  updateNotificationChannel: async (channelId: string, payload: Partial<PlatformNotificationChannelInput>) => {
+    const response = await apiClient.getClient().patch(`/platform-admin/notifications/channels/${channelId}`, payload);
+    return response.data as { item: PlatformNotificationChannelItem };
+  },
+
+  deleteNotificationChannel: async (channelId: string) => {
+    const response = await apiClient.getClient().delete(`/platform-admin/notifications/channels/${channelId}`);
+    return response.data as { deleted: boolean };
+  },
+
+  testNotificationChannel: async (channelId: string, payload?: { title?: string; message?: string }) => {
+    const response = await apiClient.getClient().post(`/platform-admin/notifications/channels/${channelId}/test`, payload || {});
+    return response.data as { ok: boolean; result?: unknown };
+  },
+
+  listNotificationRules: async () => {
+    const response = await apiClient.getClient().get('/platform-admin/notifications/rules');
+    return response.data as { event_catalog: PlatformNotificationEventCatalogItem[]; items: PlatformNotificationRuleItem[] };
+  },
+
+  updateNotificationRules: async (payload: { items: PlatformNotificationRuleItem[] }) => {
+    const response = await apiClient.getClient().put('/platform-admin/notifications/rules', payload);
+    return response.data as { items: PlatformNotificationRuleItem[] };
+  },
+
+  listNotificationEvents: async (params?: { app_id?: string; event_type?: string; severity?: string; status?: string; limit?: number }) => {
+    const response = await apiClient.getClient().get('/platform-admin/notifications/events', { params });
+    return response.data as { items: PlatformNotificationEventItem[] };
+  },
+
+  listNotificationDeliveries: async (params?: { app_id?: string; status?: string; limit?: number }) => {
+    const response = await apiClient.getClient().get('/platform-admin/notifications/deliveries', { params });
+    return response.data as { items: PlatformNotificationDeliveryItem[] };
+  },
+
+  listAppNotificationEventCatalog: async (appId: string) => {
+    const response = await apiClient.getClient().get(`/platform-admin/apps/${appId}/notifications/catalog`);
+    return response.data as { items: PlatformNotificationEventCatalogItem[] };
+  },
+
+  listAppNotificationChannels: async (appId: string, params?: { channel_type?: PlatformNotificationChannelType }) => {
+    const response = await apiClient.getClient().get(`/platform-admin/apps/${appId}/notifications/channels`, { params });
+    return response.data as { items: PlatformNotificationChannelItem[] };
+  },
+
+  createAppNotificationChannel: async (appId: string, payload: PlatformNotificationChannelInput) => {
+    const response = await apiClient.getClient().post(`/platform-admin/apps/${appId}/notifications/channels`, payload);
+    return response.data as { item: PlatformNotificationChannelItem };
+  },
+
+  updateAppNotificationChannel: async (appId: string, channelId: string, payload: Partial<PlatformNotificationChannelInput>) => {
+    const response = await apiClient.getClient().patch(`/platform-admin/apps/${appId}/notifications/channels/${channelId}`, payload);
+    return response.data as { item: PlatformNotificationChannelItem };
+  },
+
+  deleteAppNotificationChannel: async (appId: string, channelId: string) => {
+    const response = await apiClient.getClient().delete(`/platform-admin/apps/${appId}/notifications/channels/${channelId}`);
+    return response.data as { deleted: boolean };
+  },
+
+  testAppNotificationChannel: async (appId: string, channelId: string, payload?: { title?: string; message?: string }) => {
+    const response = await apiClient.getClient().post(`/platform-admin/apps/${appId}/notifications/channels/${channelId}/test`, payload || {});
+    return response.data as { ok: boolean; result?: unknown };
+  },
+
+  listAppNotificationRules: async (appId: string) => {
+    const response = await apiClient.getClient().get(`/platform-admin/apps/${appId}/notifications/rules`);
+    return response.data as { event_catalog: PlatformNotificationEventCatalogItem[]; items: PlatformNotificationRuleItem[] };
+  },
+
+  updateAppNotificationRules: async (appId: string, payload: { items: PlatformNotificationRuleItem[] }) => {
+    const response = await apiClient.getClient().put(`/platform-admin/apps/${appId}/notifications/rules`, payload);
+    return response.data as { items: PlatformNotificationRuleItem[] };
+  },
+
+  listAppNotificationEvents: async (appId: string, params?: { event_type?: string; severity?: string; status?: string; limit?: number }) => {
+    const response = await apiClient.getClient().get(`/platform-admin/apps/${appId}/notifications/events`, { params });
+    return response.data as { items: PlatformNotificationEventItem[] };
+  },
+
+  listAppNotificationDeliveries: async (appId: string, params?: { status?: string; limit?: number }) => {
+    const response = await apiClient.getClient().get(`/platform-admin/apps/${appId}/notifications/deliveries`, { params });
+    return response.data as { items: PlatformNotificationDeliveryItem[] };
   },
 
   listEmailProviderSendingDomains: async (providerId: string) => {

@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import configuration from '../../config/configuration';
 import { PRISMA_CLIENT } from '../../config/database.module';
 import { AppleIdentityService, AppleLoginConfig } from '../auth/apple-identity.service';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 
 type TransactionPayload = {
   transactionId?: string;
@@ -89,6 +90,7 @@ export class AppleIapService implements OnModuleInit {
     @Inject(PRISMA_CLIENT) private readonly prisma: PrismaClient,
     @Inject(configuration.KEY) private readonly config: ConfigType<typeof configuration>,
     private readonly appleIdentityService: AppleIdentityService,
+    private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
   async onModuleInit() {
@@ -247,6 +249,24 @@ export class AppleIapService implements OnModuleInit {
       };
     } catch (error: any) {
       await this.markNotificationProcessed(uuid, 'FAILED', error?.message || String(error), [plan.action]);
+      await this.adminNotifications.emit({
+        app_id: app.id,
+        event_type: 'payment.callback.failed',
+        severity: 'critical',
+        source_module: 'apple_iap',
+        source_id: uuid,
+        title: `Apple IAP 通知处理失败：${notificationType}`,
+        message: error?.message || String(error),
+        dedupe_key: `payment:apple_iap:${app.id}:${notificationType}:${subtype || ''}:${originalTransactionId || transactionId || uuid}`,
+        payload: {
+          notification_uuid: uuid,
+          notification_type: notificationType,
+          subtype,
+          transaction_id: transactionId || null,
+          original_transaction_id: originalTransactionId || null,
+          action: plan.action,
+        },
+      });
       throw error;
     }
   }

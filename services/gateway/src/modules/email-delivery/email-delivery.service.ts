@@ -706,6 +706,43 @@ export class EmailDeliveryService implements OnModuleInit {
     return { items: rows, total: rows[0]?.total_count || 0, page, page_size: pageSize };
   }
 
+  async sendNotificationEmail(input: {
+    appId?: string | null;
+    senderId?: string | null;
+    to: string[];
+    subject: string;
+    html?: string;
+    text?: string;
+    replyTo?: string | null;
+  }) {
+    await this.ensureSchema();
+    const appId = this.optionalUuid(input.appId);
+    const senderId = this.optionalUuid(input.senderId) || (appId ? await this.resolveDefaultSenderId(appId, 'notification') : null);
+    if (!senderId) throw new BadRequestException('notification email sender_id is required');
+    const sender = appId
+      ? await this.requireSenderForApp(senderId, appId, 'notification')
+      : await this.getSenderWithAccount(senderId);
+    const recipients = Array.from(new Set((input.to || []).map((item) => this.normalizeEmail(item)).filter(Boolean))) as string[];
+    if (!recipients.length) throw new BadRequestException('notification email recipient is required');
+    const appSettings = appId
+      ? (await this.prisma.$queryRaw<Row[]>`
+          SELECT reply_to_email
+          FROM app_email_settings
+          WHERE app_id = ${appId}::uuid
+          LIMIT 1
+        `)[0] || {}
+      : {};
+    return this.dispatchEmail(sender, {
+      from: sender.display_name ? { address: sender.email, name: sender.display_name } : sender.email,
+      to: recipients,
+      subject: this.requiredString(input.subject, 'subject', 240),
+      html: input.html,
+      text: input.text,
+      reply_to: this.normalizeEmail(input.replyTo || appSettings.reply_to_email) || undefined,
+      headers: { 'X-OPG-Notification': 'admin' },
+    });
+  }
+
   async unsubscribe(appSlug: string | undefined, token: string, emailRaw?: string) {
     await this.ensureSchema();
     const app = await this.resolveAppBySlug(appSlug);

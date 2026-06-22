@@ -8,6 +8,7 @@ import {
   PLATFORM_REQUEST_EVENT_RETENTION_DAYS,
 } from './platform-observability.constants';
 import { PlatformRequestContextService } from './platform-request-context.service';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 
 type RequestEventInput = {
   request_id?: string | null;
@@ -79,10 +80,12 @@ export class PlatformObservabilityService implements OnModuleInit {
   private readonly logger = new Logger(PlatformObservabilityService.name);
   private schemaReady = false;
   private schemaPromise: Promise<boolean> | null = null;
+  private readonly errorRateAlertCheckedAt = new Map<string, number>();
 
   constructor(
     @Inject(PRISMA_CLIENT) private readonly prisma: PrismaClient,
     private readonly requestContext: PlatformRequestContextService,
+    private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
   async onModuleInit() {
@@ -100,6 +103,7 @@ export class PlatformObservabilityService implements OnModuleInit {
   async recordRequestEvent(input: RequestEventInput): Promise<void> {
     if (!(await this.ensureSchema())) return;
     const context = this.requestContext.get();
+    const statusCode = this.normalizeNullableInt(input.status_code);
     await this.prisma.$executeRawUnsafe(
       `INSERT INTO platform_request_events (
          id, request_id, trace_id, app_id, app_slug, actor_user_id, module, operation,
@@ -124,7 +128,7 @@ export class PlatformObservabilityService implements OnModuleInit {
       this.normalizeNullableString(input.method || context?.method, 12),
       this.normalizeNullableString(input.request_path || context?.path, 255),
       input.success === undefined || input.success === null ? null : input.success === true,
-      this.normalizeNullableInt(input.status_code),
+      statusCode,
       this.normalizeNullableString(input.error_category, 64),
       this.normalizeNullableString(input.error_message, 1200),
       this.normalizeNullableInt(input.latency_ms),
@@ -132,11 +136,71 @@ export class PlatformObservabilityService implements OnModuleInit {
       this.normalizeNullableString(input.user_agent, 512),
       JSON.stringify(this.normalizeMetadata(input.metadata)),
     );
+    if ((statusCode !== null && statusCode >= 500) || (statusCode === null && input.success === false)) {
+      void this.maybeEmitSystemErrorRateAlert(input, statusCode).catch((error: any) => {
+        this.logger.warn(`failed to evaluate system error-rate notification: ${error?.message || error}`);
+      });
+    }
   }
 
   recordRequestEventSafe(input: RequestEventInput): void {
     void this.recordRequestEvent(input).catch((error: any) => {
       this.logger.warn(`failed to record platform request event: ${error?.message || error}`);
+    });
+  }
+
+  private async maybeEmitSystemErrorRateAlert(input: RequestEventInput, statusCode: number | null): Promise<void> {
+    const appId = this.normalizeNullableUuid(input.app_id);
+    const moduleName = this.normalizeRequiredString(input.module, 64, 'http');
+    const scopeKey = `${appId || 'platform'}:${moduleName}`;
+    const now = Date.now();
+    const lastCheckedAt = this.errorRateAlertCheckedAt.get(scopeKey) || 0;
+    if (now - lastCheckedAt < 60_000) return;
+    this.errorRateAlertCheckedAt.set(scopeKey, now);
+
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `SELECT
+         COUNT(*)::bigint AS total_count,
+         SUM(CASE WHEN success = false OR status_code >= 500 THEN 1 ELSE 0 END)::bigint AS failure_count,
+         MAX(created_at) AS last_event_at
+       FROM platform_request_events
+       WHERE created_at >= now() - interval '5 minutes'
+         AND ($1::uuid IS NULL OR app_id = $1::uuid)
+         AND module = $2`,
+      appId,
+      moduleName,
+    )) as Array<{ total_count: bigint | number | string; failure_count: bigint | number | string; last_event_at: Date | string | null }>;
+    const totalCount = Number(rows[0]?.total_count || 0);
+    const failureCount = Number(rows[0]?.failure_count || 0);
+    const failureRate = totalCount > 0 ? failureCount / totalCount : 0;
+    if (failureCount < 10 && (totalCount < 20 || failureRate < 0.2)) return;
+
+    const rateLabel = `${Math.round(failureRate * 1000) / 10}%`;
+    const requestPath = this.normalizeNullableString(input.request_path, 255);
+    const dedupeHash = createHash('sha1')
+      .update([appId || 'platform', moduleName, requestPath || '', statusCode || 'unknown'].join(':'))
+      .digest('hex')
+      .slice(0, 12);
+    await this.adminNotifications.emit({
+      app_id: appId,
+      event_type: 'system.error_rate.high',
+      severity: 'critical',
+      source_module: 'observability',
+      source_id: this.normalizeNullableString(input.request_id, 128) || moduleName,
+      title: `系统错误率升高：${moduleName}`,
+      message: `5 分钟内 ${failureCount}/${totalCount} 个请求失败，失败率 ${rateLabel}。`,
+      dedupe_key: `system_error_rate:${appId || 'platform'}:${moduleName}:${dedupeHash}`,
+      payload: {
+        app_slug: this.normalizeNullableString(input.app_slug, 64),
+        module: moduleName,
+        request_path: requestPath,
+        status_code: statusCode,
+        failure_count: failureCount,
+        total_count: totalCount,
+        failure_rate: failureRate,
+        window_seconds: 300,
+        last_event_at: rows[0]?.last_event_at || null,
+      },
     });
   }
 

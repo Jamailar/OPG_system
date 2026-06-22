@@ -32,6 +32,7 @@ import { AiVideoResultProxyService } from './ai-video-result-proxy.service';
 import { AiGatewayObservabilityService } from './ai-gateway-observability.service';
 import { OutboundHttpClientService } from '../outbound-proxy/outbound-http-client.service';
 import { RuntimeSettingsService } from '../runtime-settings/runtime-settings.service';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 import {
   RUNNINGHUB_DEFAULT_QUERY_PATH,
   RUNNINGHUB_DEFAULT_UPLOAD_PATH,
@@ -378,6 +379,7 @@ export class AiChatService implements OnModuleInit {
     private readonly aiGatewayObservability: AiGatewayObservabilityService,
     private readonly outboundHttp: OutboundHttpClientService,
     private readonly runtimeSettingsService: RuntimeSettingsService,
+    private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
   async onModuleInit() {
@@ -1238,7 +1240,7 @@ export class AiChatService implements OnModuleInit {
         }
         if (route.capability === 'video') {
           if (options.video_mode === 'async') {
-            return this.forwardDashscopeNativeVideoAsync(route, normalizedPayload);
+            return this.forwardDashscopeNativeVideoAsync(route, normalizedPayload, context);
           }
           return this.forwardDashscopeNativeVideo(route, upstreamPayload, context);
         }
@@ -1971,7 +1973,10 @@ export class AiChatService implements OnModuleInit {
           user_id: claimed.user_id,
           request_path: claimed.request_path || '',
         });
-        const forwarded = await this.forwardDashscopeNativeVideoAsync(route, upstreamPayload);
+        const forwarded = await this.forwardDashscopeNativeVideoAsync(route, upstreamPayload, {
+          user_id: claimed.user_id,
+          request_path: claimed.request_path || '',
+        });
         const providerTaskId = this.stringOrUndefined((forwarded as any)?.data?.task_id);
         if (!providerTaskId) {
           throw new BadGatewayException('DashScope async video accepted but no task_id returned');
@@ -6092,6 +6097,13 @@ export class AiChatService implements OnModuleInit {
         this.logger.error(
           `AI upstream failed capability=${route.capability} model=${route.model_key} source=${route.source.name} status=${upstreamResp.status} body=${this.truncate(String(errorBody || ''), 600)}`,
         );
+        await this.emitAiFailureNotification(route, context, {
+          status: upstreamResp.status,
+          message: errorBody || upstreamResp.statusText || 'request failed',
+          stage: 'upstream_error',
+          source_id: gatewayRequestId,
+          payload: { attempted_endpoints: upstreamResult.attemptedEndpoints },
+        });
         const attemptedEndpointsSuffix = this.buildAttemptedEndpointsSuffix(upstreamResult.attemptedEndpoints);
         throw new BadGatewayException(
           `AI upstream error (${upstreamResp.status}): ${errorBody || upstreamResp.statusText || 'request failed'}${attemptedEndpointsSuffix}`,
@@ -6130,6 +6142,12 @@ export class AiChatService implements OnModuleInit {
           status_code: this.numberOrNull(error?.status) ?? null,
           error_message: error?.message || null,
           latency_ms: Date.now() - startedAt,
+        });
+        await this.emitAiFailureNotification(route, context, {
+          status: this.numberOrNull(error?.status) ?? null,
+          message: error?.message || String(error),
+          stage: 'upstream_exception',
+          source_id: gatewayRequestId,
         });
       }
       release();
@@ -6211,6 +6229,13 @@ export class AiChatService implements OnModuleInit {
         this.logger.error(
           `AI upstream multipart failed capability=${route.capability} model=${route.model_key} source=${route.source.name} status=${upstreamResp.status} body=${this.truncate(String(errorBody || ''), 600)}`,
         );
+        await this.emitAiFailureNotification(route, context, {
+          status: upstreamResp.status,
+          message: errorBody || upstreamResp.statusText || 'request failed',
+          stage: 'upstream_multipart_error',
+          source_id: gatewayRequestId,
+          payload: { attempted_endpoints: upstreamResult.attemptedEndpoints, multipart: true },
+        });
         const attemptedEndpointsSuffix = this.buildAttemptedEndpointsSuffix(upstreamResult.attemptedEndpoints);
         throw new BadGatewayException(
           `AI upstream error (${upstreamResp.status}): ${errorBody || upstreamResp.statusText || 'request failed'}${attemptedEndpointsSuffix}`,
@@ -6252,6 +6277,13 @@ export class AiChatService implements OnModuleInit {
           metadata: {
             multipart: true,
           },
+        });
+        await this.emitAiFailureNotification(route, context, {
+          status: this.numberOrNull(error?.status) ?? null,
+          message: error?.message || String(error),
+          stage: 'upstream_multipart_exception',
+          source_id: gatewayRequestId,
+          payload: { multipart: true },
         });
       }
       release();
@@ -6392,6 +6424,78 @@ export class AiChatService implements OnModuleInit {
     return this.aiProtocolAdapter.withOpenAiStreamUsageOptions(route, payload);
   }
 
+  private async emitAiFailureNotification(
+    route: ResolvedAiRoute,
+    context: AiInvocationContext = {},
+    input: {
+      status?: number | null;
+      message?: string | null;
+      stage?: string;
+      source_id?: string | null;
+      event_type?: 'ai.provider.failed' | 'ai.quota_or_auth.failed' | 'video.task.failed';
+      payload?: Record<string, unknown>;
+    } = {},
+  ) {
+    try {
+      const status = this.numberOrNull(input.status) ?? null;
+      const eventType = input.event_type || this.resolveAiFailureEventType(route, status);
+      const message = this.truncate(String(input.message || 'request failed'), 1000);
+      const hash = createHash('sha1')
+        .update([eventType, route.app_id, route.source.id, route.model_key, status || '', input.stage || '', message].join(':'))
+        .digest('hex')
+        .slice(0, 16);
+      await this.adminNotifications.emit({
+        app_id: route.app_id,
+        event_type: eventType,
+        severity: eventType === 'ai.quota_or_auth.failed' ? 'critical' : 'high',
+        source_module: route.capability === 'video' ? 'video' : 'ai',
+        source_id: input.source_id || route.route_key || route.model_id,
+        title: this.buildAiFailureTitle(eventType, route, status),
+        message,
+        dedupe_key: `ai:${route.app_id}:${eventType}:${route.source.id}:${route.model_key}:${status || 'exception'}:${hash}`,
+        payload: {
+          stage: input.stage || null,
+          status,
+          app_slug: route.app_slug,
+          capability: route.capability,
+          model_key: route.model_key,
+          upstream_model: route.upstream_model,
+          source_id: route.source.id,
+          source_name: route.source.name,
+          provider_type: route.source.provider_type,
+          request_path: context.request_path || null,
+          user_id: context.user_id || null,
+          message,
+          ...(input.payload || {}),
+        },
+      });
+    } catch (error: any) {
+      this.logger.warn(`admin notification for ai failure skipped: ${error?.message || error}`);
+    }
+  }
+
+  private resolveAiFailureEventType(route: ResolvedAiRoute, status: number | null) {
+    if (status === 401 || status === 403 || status === 429) return 'ai.quota_or_auth.failed';
+    if (route.capability === 'video') return 'video.task.failed';
+    return 'ai.provider.failed';
+  }
+
+  private buildAiFailureTitle(eventType: string, route: ResolvedAiRoute, status: number | null) {
+    const suffix = status ? `HTTP ${status}` : '异常';
+    if (eventType === 'video.task.failed') return `视频任务失败：${route.model_key} (${suffix})`;
+    if (eventType === 'ai.quota_or_auth.failed') return `AI 额度或鉴权失败：${route.source.name} (${suffix})`;
+    return `AI 供应商失败：${route.source.name} (${suffix})`;
+  }
+
+  private sanitizeUrlForNotification(url: string) {
+    try {
+      const parsed = new URL(url);
+      return `${parsed.origin}${parsed.pathname}`;
+    } catch {
+      return this.truncate(String(url || ''), 240);
+    }
+  }
+
   private async fetchUpstream(
     route: ResolvedAiRoute,
     endpointUrl: string,
@@ -6405,11 +6509,24 @@ export class AiChatService implements OnModuleInit {
       if (response.ok) {
         this.aiGatewayThrottle.recordSuccess(route);
       } else {
-        this.aiGatewayThrottle.recordFailure(route, response.status, response.statusText);
+        const errorPreview = await response.clone().text().catch(() => '');
+        this.aiGatewayThrottle.recordFailure(route, response.status, errorPreview || response.statusText);
+        await this.emitAiFailureNotification(route, context, {
+          status: response.status,
+          message: errorPreview || response.statusText || 'request failed',
+          stage: 'direct_upstream_error',
+          payload: { endpoint_url: this.sanitizeUrlForNotification(endpointUrl) },
+        });
       }
       return response;
     } catch (error: any) {
       this.aiGatewayThrottle.recordFailure(route, this.numberOrNull(error?.status) ?? null, error?.message || null);
+      await this.emitAiFailureNotification(route, context, {
+        status: this.numberOrNull(error?.status) ?? null,
+        message: error?.message || String(error),
+        stage: 'direct_upstream_exception',
+        payload: { endpoint_url: this.sanitizeUrlForNotification(endpointUrl) },
+      });
       throw error;
     } finally {
       release();
@@ -6946,6 +7063,13 @@ export class AiChatService implements OnModuleInit {
         latency_ms: Date.now() - startedAt,
         error_message: this.truncate(String(error?.message || 'unknown error'), 900),
       });
+      await this.emitAiFailureNotification(route, context, {
+        event_type: 'video.task.failed',
+        stage: 'runninghub_video_failed',
+        message: error?.message || String(error),
+        source_id: taskId || null,
+        payload: { task_id: taskId },
+      });
       throw error;
     }
   }
@@ -6956,23 +7080,35 @@ export class AiChatService implements OnModuleInit {
     context: AiInvocationContext,
   ): Promise<ForwardedAiResponse> {
     const schema = resolveRunningHubSchema(route.request_overrides, route.endpoint_path);
-    const normalizedInput = await this.normalizeRunningHubVideoInput(route, payload, schema, context);
-    const submitPath = this.resolveRunningHubSubmitPath(route, schema, normalizedInput.input_kind);
-    const submitUrl = this.joinUrl(route.source.base_url, submitPath);
-    const requestBody = this.buildRunningHubVideoRequestPayload(schema, normalizedInput);
-    const submitData = await this.fetchRunningHubJson(route, submitUrl, requestBody, context);
-    const taskId = extractRunningHubTaskId(submitData);
-    if (!taskId) {
-      const submitError = extractRunningHubTaskErrorMessage(submitData) || this.truncate(JSON.stringify(submitData), 500);
-      throw new BadGatewayException(`RunningHub async video accepted but no taskId returned: ${submitError}`);
+    let taskId: string | null = null;
+    try {
+      const normalizedInput = await this.normalizeRunningHubVideoInput(route, payload, schema, context);
+      const submitPath = this.resolveRunningHubSubmitPath(route, schema, normalizedInput.input_kind);
+      const submitUrl = this.joinUrl(route.source.base_url, submitPath);
+      const requestBody = this.buildRunningHubVideoRequestPayload(schema, normalizedInput);
+      const submitData = await this.fetchRunningHubJson(route, submitUrl, requestBody, context);
+      taskId = extractRunningHubTaskId(submitData);
+      if (!taskId) {
+        const submitError = extractRunningHubTaskErrorMessage(submitData) || this.truncate(JSON.stringify(submitData), 500);
+        throw new BadGatewayException(`RunningHub async video accepted but no taskId returned: ${submitError}`);
+      }
+      return {
+        stream: false,
+        data: this.buildRunningHubVideoTaskResponse(submitData, {
+          includeVideoUrls: false,
+          fallbackTaskId: taskId,
+        }),
+      };
+    } catch (error: any) {
+      await this.emitAiFailureNotification(route, context, {
+        event_type: 'video.task.failed',
+        stage: 'runninghub_async_video_submit_failed',
+        message: error?.message || String(error),
+        source_id: taskId || null,
+        payload: { task_id: taskId },
+      });
+      throw error;
     }
-    return {
-      stream: false,
-      data: this.buildRunningHubVideoTaskResponse(submitData, {
-        includeVideoUrls: false,
-        fallbackTaskId: taskId,
-      }),
-    };
   }
 
   private normalizeRunningHubSyncImageErrorMessage(error: unknown, taskId: string | null): string {
@@ -8853,6 +8989,16 @@ export class AiChatService implements OnModuleInit {
         latency_ms: Date.now() - startedAt,
         error_message: `DashScope returned empty video result: ${this.truncate(JSON.stringify(finalData), 900)}`,
       });
+      await this.emitAiFailureNotification(route, context, {
+        event_type: 'video.task.failed',
+        stage: 'dashscope_video_empty_result',
+        message: 'DashScope video generation completed but no video url returned',
+        source_id: this.extractDashscopeTaskId(finalData) || this.extractDashscopeTaskId(initialData) || null,
+        payload: {
+          task_id: this.extractDashscopeTaskId(finalData) || this.extractDashscopeTaskId(initialData) || null,
+          response_preview: this.truncate(JSON.stringify(finalData), 900),
+        },
+      });
       throw new BadGatewayException('DashScope video generation completed but no video url returned');
     }
 
@@ -8883,6 +9029,7 @@ export class AiChatService implements OnModuleInit {
   private async forwardDashscopeNativeVideoAsync(
     route: ResolvedAiRoute,
     payload: Record<string, unknown>,
+    context: AiInvocationContext = {},
   ): Promise<ForwardedAiResponse> {
     const endpointPath = this.resolveDashscopeNativeVideoEndpoint(route);
     const endpointUrl = this.buildDashscopeEndpointUrl(route.source.base_url, endpointPath);
@@ -8897,7 +9044,7 @@ export class AiChatService implements OnModuleInit {
       method: 'POST',
       headers,
       body: JSON.stringify(requestPayload),
-    });
+    }, context);
     if (!response.ok) {
       const errorBody = await response.text();
       throw new BadGatewayException(
@@ -8907,6 +9054,12 @@ export class AiChatService implements OnModuleInit {
     const data = await this.parseJsonObjectFromResponse(response);
     const taskId = this.extractDashscopeTaskId(data);
     if (!taskId) {
+      await this.emitAiFailureNotification(route, context, {
+        event_type: 'video.task.failed',
+        stage: 'dashscope_async_video_missing_task_id',
+        message: 'DashScope async video accepted but no task_id returned',
+        payload: { response_preview: this.truncate(JSON.stringify(data), 900) },
+      });
       throw new BadGatewayException('DashScope async video accepted but no task_id returned');
     }
     return {
@@ -10185,6 +10338,17 @@ export class AiChatService implements OnModuleInit {
     }
     if (taskStatus && this.isDashscopeTaskTerminalFailure(taskStatus)) {
       const message = this.resolveDashscopeTaskErrorMessage(data) || `task_status=${taskStatus}`;
+      await this.emitAiFailureNotification(route, {}, {
+        event_type: 'video.task.failed',
+        stage: 'dashscope_task_terminal_failure',
+        message,
+        source_id: taskId,
+        payload: {
+          task_id: taskId,
+          task_status: taskStatus,
+          response_preview: this.truncate(JSON.stringify(data), 900),
+        },
+      });
       throw new BadGatewayException(`DashScope task failed: ${message}`);
     }
 
@@ -10297,6 +10461,18 @@ export class AiChatService implements OnModuleInit {
       }
       if (status && this.isDashscopeTaskTerminalFailure(status)) {
         const message = this.resolveDashscopeTaskErrorMessage(data) || `task_status=${status}`;
+        await this.emitAiFailureNotification(route, {}, {
+          event_type: 'video.task.failed',
+          stage: 'dashscope_task_poll_terminal_failure',
+          message,
+          source_id: taskId,
+          payload: {
+            task_id: taskId,
+            task_status: status,
+            attempt,
+            response_preview: this.truncate(JSON.stringify(data), 900),
+          },
+        });
         throw new BadGatewayException(`DashScope task failed: ${message}`);
       }
 
@@ -10305,6 +10481,13 @@ export class AiChatService implements OnModuleInit {
       }
     }
 
+    await this.emitAiFailureNotification(route, {}, {
+      event_type: 'video.task.failed',
+      stage: 'dashscope_task_poll_timeout',
+      message: `DashScope task polling timeout after ${pollAttempts} attempts`,
+      source_id: taskId,
+      payload: { task_id: taskId, poll_attempts: pollAttempts },
+    });
     throw new BadGatewayException(`DashScope task polling timeout after ${pollAttempts} attempts`);
   }
 

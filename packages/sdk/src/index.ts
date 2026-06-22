@@ -299,6 +299,26 @@ export type OpgPlatformClient = {
     appRequestEvents(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
     appAuditEvents(appId: string, query?: OpgQuery): Promise<Record<string, unknown>>;
   };
+  notifications: {
+    catalog(appId?: string): Promise<Record<string, unknown>>;
+    channels: {
+      list(appId?: string, query?: OpgQuery): Promise<Record<string, unknown>>;
+      create(input: Record<string, unknown> & { app_id?: string; appId?: string }): Promise<Record<string, unknown>>;
+      update(channelId: string, input: Record<string, unknown> & { app_id?: string; appId?: string }): Promise<Record<string, unknown>>;
+      delete(channelId: string, appId?: string): Promise<Record<string, unknown>>;
+      test(channelId: string, input?: Record<string, unknown> & { app_id?: string; appId?: string }): Promise<Record<string, unknown>>;
+    };
+    rules: {
+      list(appId?: string): Promise<Record<string, unknown>>;
+      update(appId: string | null | undefined, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+    };
+    events: {
+      list(query?: OpgQuery & { app_id?: string; appId?: string }): Promise<Record<string, unknown>>;
+    };
+    deliveries: {
+      list(query?: OpgQuery & { app_id?: string; appId?: string }): Promise<Record<string, unknown>>;
+    };
+  };
   tasks: {
     runtime(): Promise<Record<string, unknown>>;
     list(query?: OpgQuery): Promise<Record<string, unknown>>;
@@ -689,6 +709,11 @@ export function createOpgPlatformClient(options: OpgClientOptions): OpgPlatformC
 
   const appsBase = '/apps';
   const appPath = (appId: string, path = '') => `${appsBase}/${encodeURIComponent(appId)}${path}`;
+  const notificationPath = (appId?: string | null, path = '') => appId ? appPath(appId, `/notifications${path}`) : `/notifications${path}`;
+  const appIdFromInput = (input?: Record<string, unknown> | null) => {
+    const raw = input?.app_id ?? input?.appId;
+    return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
+  };
   const aiModels = crud('/ai/models');
   const aiSources = crud('/ai/sources');
 
@@ -902,6 +927,28 @@ export function createOpgPlatformClient(options: OpgClientOptions): OpgPlatformC
       auditEvents: (query) => request('/observability/audit-events', { query }),
       appRequestEvents: (appId, query) => request(appPath(appId, '/observability/request-events'), { query }),
       appAuditEvents: (appId, query) => request(appPath(appId, '/observability/audit-events'), { query }),
+    },
+    notifications: {
+      catalog: (appId) => request(notificationPath(appId, '/catalog')),
+      channels: {
+        list: (appId, query) => request(notificationPath(appId, '/channels'), { query }),
+        create: (input) => request(notificationPath(appIdFromInput(input), '/channels'), { method: 'POST', body: input }),
+        update: (channelId, input) =>
+          request(notificationPath(appIdFromInput(input), `/channels/${encodeURIComponent(channelId)}`), { method: 'PATCH', body: input }),
+        delete: (channelId, appId) => request(notificationPath(appId, `/channels/${encodeURIComponent(channelId)}`), { method: 'DELETE' }),
+        test: (channelId, input = {}) =>
+          request(notificationPath(appIdFromInput(input), `/channels/${encodeURIComponent(channelId)}/test`), { method: 'POST', body: input }),
+      },
+      rules: {
+        list: (appId) => request(notificationPath(appId, '/rules')),
+        update: (appId, input) => request(notificationPath(appId, '/rules'), { method: 'PUT', body: input }),
+      },
+      events: {
+        list: (query) => request(notificationPath(appIdFromInput(query as Record<string, unknown> | undefined), '/events'), { query }),
+      },
+      deliveries: {
+        list: (query) => request(notificationPath(appIdFromInput(query as Record<string, unknown> | undefined), '/deliveries'), { query }),
+      },
     },
     tasks: {
       runtime: () => request('/tasks/runtime'),

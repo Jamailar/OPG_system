@@ -126,6 +126,32 @@ opg platform feedbacks review \
   --json '{"action":"thanks","note":"有效反馈"}'
 ```
 
+配置管理员通知：
+
+```bash
+opg platform notifications channels list --app-id <app-id>
+
+opg platform notifications channels create \
+  --app-id <app-id> \
+  --json '{"channel_type":"EMAIL","name":"Ops Email","recipients":["ops@example.com"]}'
+
+opg platform notifications channels create \
+  --app-id <app-id> \
+  --json '{"channel_type":"FEISHU_ROBOT","name":"Ops Feishu","webhook_url":"https://open.feishu.cn/open-apis/bot/v2/hook/xxx","secret":"replace-me"}'
+
+opg platform notifications channels test \
+  --app-id <app-id> \
+  --channel-id <channel-id>
+
+opg platform notifications rules list --app-id <app-id>
+opg platform notifications rules update \
+  --app-id <app-id> \
+  --json '{"items":[{"event_type":"feedback.bug_report.created","enabled":true,"min_severity":"high","channel_ids":[],"dedupe_window_seconds":600,"aggregation_window_seconds":0}]}'
+
+opg platform notifications events list --app-id <app-id>
+opg platform notifications deliveries list --app-id <app-id>
+```
+
 读取指定 app 的运营数据：
 
 ```bash
@@ -246,9 +272,21 @@ opg mcp
 - `opg_platform_app_create`
 - `opg_platform_app_feedbacks_list`
 - `opg_platform_app_feedback_get`
+- `opg_platform_app_notification_channels_list`
+- `opg_platform_app_notification_channel_create`
+- `opg_platform_app_notification_channel_test`
+- `opg_platform_app_notification_rules_list`
+- `opg_platform_app_notification_rules_update`
+- `opg_platform_app_notification_events_list`
 - `opg_platform_app_analytics_users`
 - `opg_platform_app_ai_usage_logs`
 - `opg_platform_app_payment_orders`
+- `opg_platform_app_admins_list`
+- `opg_platform_app_admin_permissions_me`
+- `opg_platform_app_admin_upsert`
+- `opg_platform_app_admin_permissions_update`
+- `opg_platform_app_admin_status_update`
+- `opg_platform_app_admin_remove`
 - `opg_platform_runtime_overview`
 - `opg_platform_runtime_refresh`
 - `opg_platform_runtime_templates`
@@ -264,6 +302,13 @@ opg mcp
 - `opg_database_manifest_get`
 - `opg_database_query`
 - `opg_database_execute`
+
+管理员 RBAC 更新使用角色模板加额外权限：
+
+```bash
+opg platform request --method POST --path /apps/<app-id>/admins --json '{"email":"ops@example.com","password":"change-me-min-8","admin_type":"ADMIN","role_keys":["operations"],"permission_overrides":["app.orders.refund"]}'
+opg platform request --method PATCH --path /apps/<app-id>/admins/<admin-user-id>/permissions --json '{"role_keys":["support"],"permission_overrides":["app.feedback.reward"]}'
+```
 
 ## 本地文件和优先级
 

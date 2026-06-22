@@ -23,6 +23,7 @@ import PlatformSmsServicesPage from '@/pages/platform/PlatformSmsServicesPage';
 import PlatformEmailServicePage from '@/pages/platform/PlatformEmailServicePage';
 import PlatformStorageSettingsPage from '@/pages/platform/PlatformStorageSettingsPage';
 import PlatformObservabilityPage from '@/pages/platform/PlatformObservabilityPage';
+import PlatformNotificationsPage from '@/pages/platform/PlatformNotificationsPage';
 import DeveloperAuthorizationsPage from '@/pages/platform/DeveloperAuthorizationsPage';
 import PlatformJobsPage from '@/pages/platform/PlatformJobsPage';
 import PlatformRuntimePage from '@/pages/platform/PlatformRuntimePage';
@@ -279,6 +280,15 @@ function App() {
             element={
               <PlatformProtectedRoute>
                 <PlatformObservabilityPage />
+              </PlatformProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/platform-admin/notifications"
+            element={
+              <PlatformProtectedRoute>
+                <PlatformNotificationsPage />
               </PlatformProtectedRoute>
             }
           />

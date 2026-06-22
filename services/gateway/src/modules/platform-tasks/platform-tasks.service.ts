@@ -1,6 +1,7 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PRISMA_CLIENT } from '../../config/database.module';
+import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 import { PlatformObservabilityService } from '../observability/platform-observability.service';
 import { PlatformTaskQueueService } from './platform-task-queue.service';
 import {
@@ -28,6 +29,7 @@ export class PlatformTasksService implements OnModuleInit {
     @Inject(PRISMA_CLIENT) private readonly prisma: PrismaClient,
     private readonly queueService: PlatformTaskQueueService,
     private readonly observabilityService: PlatformObservabilityService,
+    private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
   async onModuleInit() {
@@ -443,6 +445,27 @@ export class PlatformTasksService implements OnModuleInit {
       stage: status,
       payload: { worker_id: workerId, error_code: input.error_code, retryable, next_retry_seconds: nextRetrySeconds },
     }).catch(() => undefined);
+    if (!retryable) {
+      await this.adminNotifications.emit({
+        app_id: typeof rows[0]?.app_id === 'string' ? String(rows[0].app_id) : null,
+        event_type: 'platform_task.failed',
+        severity: 'high',
+        source_module: 'platform_tasks',
+        source_id: taskId,
+        title: `后台任务失败：${String(task.module || '')}/${String(task.action || '')}`,
+        message: input.error_message,
+        dedupe_key: `platform_task:${String(task.app_id || 'platform')}:${String(task.module || '')}:${String(task.action || '')}:${input.error_code}`,
+        payload: {
+          task_id: taskId,
+          worker_id: workerId,
+          module: task.module,
+          action: task.action,
+          error_code: input.error_code,
+          attempt,
+          max_attempts: maxAttempts,
+        },
+      });
+    }
     return this.getTask(taskId, typeof rows[0]?.app_id === 'string' ? String(rows[0].app_id) : undefined);
   }
 
@@ -529,6 +552,26 @@ export class PlatformTasksService implements OnModuleInit {
       this.requiredText(input.status, 32, 'online'),
       JSON.stringify(this.objectValue(input.metadata)),
     )) as Record<string, unknown>[];
+    const status = String(rows[0]?.status || '').toLowerCase();
+    if (status && status !== 'online') {
+      await this.adminNotifications.emit({
+        app_id: null,
+        event_type: 'worker.offline',
+        severity: 'high',
+        source_module: 'platform_tasks',
+        source_id: workerId,
+        title: `工作器状态异常：${workerId}`,
+        message: `worker status=${status}`,
+        dedupe_key: `worker:${workerId}:${status}`,
+        payload: {
+          worker_id: workerId,
+          status,
+          kind: rows[0]?.kind,
+          queue_names: rows[0]?.queue_names_json,
+          metadata: rows[0]?.metadata_json,
+        },
+      });
+    }
     return rows[0] || null;
   }
 

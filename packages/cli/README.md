@@ -61,6 +61,12 @@ opg platform feedbacks get --app-id <app-id> --feedback-id <feedback-id>
 opg platform feedbacks update --app-id <app-id> --feedback-id <feedback-id> --json '{"status":"triaged"}'
 opg platform feedbacks comment --app-id <app-id> --feedback-id <feedback-id> --json '{"body":"已收到","is_internal":true}'
 opg platform feedbacks review --app-id <app-id> --feedback-id <feedback-id> --json '{"action":"thanks"}'
+opg platform notifications channels list --app-id <app-id>
+opg platform notifications channels create --app-id <app-id> --json '{"channel_type":"EMAIL","name":"Ops Email","recipients":["ops@example.com"]}'
+opg platform notifications channels test --app-id <app-id> --channel-id <channel-id>
+opg platform notifications rules update --app-id <app-id> --json '{"items":[{"event_type":"feedback.bug_report.created","enabled":true,"min_severity":"high","channel_ids":[]}]}'
+opg platform notifications events list --app-id <app-id>
+opg platform notifications deliveries list --app-id <app-id>
 opg platform analytics business --app-id <app-id> --days 30
 opg platform analytics overview --app-id <app-id> --days 30
 opg platform analytics growth --app-id <app-id> --days 30
@@ -83,8 +89,14 @@ opg platform request --path /storage/providers --method GET
 
 The MCP server also exposes platform tools for app creation, runtime settings,
 runtime registry/templates, storage providers, AI sources/models, app feedback,
-app analytics, app AI usage, app payment orders, and a generic `opg_platform_request` escape hatch for other
+app notifications, app analytics, app AI usage, app payment orders, and a generic `opg_platform_request` escape hatch for other
 `/api/v1/platform-admin/*` endpoints.
+
+App admin RBAC can be managed through `opg_platform_app_admins_list`,
+`opg_platform_app_admin_upsert`, and `opg_platform_app_admin_permissions_update`.
+Use `role_keys` for role templates and `permission_overrides` for extra
+granular permissions. The CLI command surface can also call the same endpoints
+with `opg platform request`.
 
 Common app-data MCP tools:
 
@@ -93,10 +105,22 @@ Common app-data MCP tools:
 - `opg_platform_app_feedback_update`
 - `opg_platform_app_feedback_comment`
 - `opg_platform_app_feedback_review`
+- `opg_platform_app_notification_channels_list`
+- `opg_platform_app_notification_channel_create`
+- `opg_platform_app_notification_channel_test`
+- `opg_platform_app_notification_rules_list`
+- `opg_platform_app_notification_rules_update`
+- `opg_platform_app_notification_events_list`
 - `opg_platform_app_analytics_overview`
 - `opg_platform_app_analytics_users`
 - `opg_platform_app_ai_usage_logs`
 - `opg_platform_app_payment_orders`
+- `opg_platform_app_admins_list`
+- `opg_platform_app_admin_permissions_me`
+- `opg_platform_app_admin_upsert`
+- `opg_platform_app_admin_permissions_update`
+- `opg_platform_app_admin_status_update`
+- `opg_platform_app_admin_remove`
 - `opg_platform_runtime_overview`
 - `opg_platform_runtime_refresh`
 - `opg_platform_runtime_templates`
