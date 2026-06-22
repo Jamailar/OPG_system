@@ -1,6 +1,6 @@
 {
   "name": "@jamba/opg-cli",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "description": "OPG CLI and Codex MCP server for AI app backend development.",
   "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.1",
-    "opg-sdk": "0.2.6",
+    "opg-sdk": "0.3.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
