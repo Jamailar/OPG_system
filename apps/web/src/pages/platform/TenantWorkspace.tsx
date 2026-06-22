@@ -140,7 +140,7 @@ interface PaymentTestPayload {
 
 const WORKSPACE_NAV: Array<{ key: WorkspaceSection; label: string; desc: string }> = [
   { key: 'overview', label: '应用概览', desc: '统计、域名与关键配置' },
-  { key: 'build-data', label: 'Build / Data', desc: '表、字段与 Data API' },
+  { key: 'build-data', label: '数据构建', desc: '表结构与数据接口' },
   { key: 'analytics', label: '经营分析', desc: '用户、订单、账单统计' },
   { key: 'ai-usage', label: 'AI 调用统计', desc: '单 app 调用与消耗趋势' },
   { key: 'logs', label: '日志', desc: '请求、审计、AI 与任务' },
