@@ -15,6 +15,7 @@ import configuration from '../../config/configuration';
 import { PRISMA_CLIENT } from '../../config/database.module';
 import { RedeemService } from '../redeem/redeem.service';
 import { AiPointsService, DEFAULT_POINTS_PER_YUAN } from '../ai-chat/ai-points.service';
+import { normalizePlatformAppAdminPermissions } from '../../common/platform-admin-permissions';
 
 type TxClient = Prisma.TransactionClient;
 type ProductType = 'ONE_TIME' | 'RECURRING';
@@ -2907,7 +2908,26 @@ export class PaymentsService implements OnModuleInit {
     }
     const isSuper = String(actor.admin_type || '').toUpperCase() === 'SUPER_ADMIN' || !!actor.is_superuser;
     if (!isSuper) {
-      const rows = await (this.prisma.$queryRawUnsafe(
+      const roleRows = await (this.prisma.$queryRawUnsafe(
+        `SELECT rp.permission_key
+         FROM admin_user_role_assignments a
+         JOIN admin_roles r ON r.id = a.role_id
+         JOIN admin_role_permissions rp ON rp.role_id = r.id
+         WHERE a.app_id = $1::uuid
+           AND a.admin_user_id = $2::uuid
+           AND r.status = 'ACTIVE'
+           AND (r.app_id IS NULL OR r.app_id = a.app_id)
+         UNION
+         SELECT permission_key
+         FROM admin_user_permission_overrides
+         WHERE app_id = $1::uuid
+           AND admin_user_id = $2::uuid
+           AND effect = 'ALLOW'
+           AND (expires_at IS NULL OR expires_at > now())`,
+        app.id,
+        actor.id,
+      ) as Promise<Array<{ permission_key: string }>>);
+      const legacyRows = await (this.prisma.$queryRawUnsafe(
         `SELECT allowed_pages
          FROM admin_page_permissions
          WHERE app_id = $1::uuid AND admin_user_id = $2::uuid
@@ -2915,8 +2935,18 @@ export class PaymentsService implements OnModuleInit {
         app.id,
         actor.id,
       ) as Promise<AdminPermissionRow[]>);
-      const allowedPages = this.parseJsonStringArray(rows[0]?.allowed_pages);
-      if (!allowedPages.includes('admin_product_payments')) {
+      const allowedPages = normalizePlatformAppAdminPermissions([
+        ...roleRows.map((row) => row.permission_key),
+        ...this.parseJsonStringArray(legacyRows[0]?.allowed_pages),
+      ]);
+      const canUseCommerce =
+        allowedPages.includes('app.products.read') ||
+        allowedPages.includes('app.products.write') ||
+        allowedPages.includes('app.orders.read') ||
+        allowedPages.includes('app.orders.refund') ||
+        allowedPages.includes('app.orders.charge') ||
+        allowedPages.includes('app.redeem.codes.read');
+      if (!canUseCommerce) {
         throw new ForbiddenException('无权访问产品与支付页面');
       }
     }

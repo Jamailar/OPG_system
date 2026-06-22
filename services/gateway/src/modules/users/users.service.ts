@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
@@ -11,11 +11,12 @@ import { AuthService } from '../auth/auth.service';
 import { BehaviorAnalyticsService } from '../behavior-analytics/behavior-analytics.service';
 import { FeedbackService } from '../feedback/feedback.service';
 import { RedeemService } from '../redeem/redeem.service';
-const ADMIN_PERMISSION_CATALOG = [
-  { key: 'admin_accounts', name: '管理员分配', description: '子管理员分配、页面权限设置、账号删除' },
-  { key: 'admin_redeem_codes', name: '兑换码管理', description: '兑换码创建、作废与列表' },
-  { key: 'admin_product_payments', name: '产品与支付', description: '支付商品、订单、签约和扣款' },
-];
+import {
+  findInvalidPlatformAppAdminPermissions,
+  normalizePlatformAppAdminPermissions,
+  PLATFORM_APP_ADMIN_PERMISSION_CATALOG,
+  PLATFORM_APP_ADMIN_ROLE_TEMPLATES,
+} from '../../common/platform-admin-permissions';
 
 type AdminPermissionGroupRow = {
   id: string;
@@ -499,7 +500,7 @@ export class UsersService {
   }
 
   getAdminPermissionCatalog() {
-    return ADMIN_PERMISSION_CATALOG;
+    return PLATFORM_APP_ADMIN_PERMISSION_CATALOG;
   }
 
   async getMyAdminPagePermissions(userId: string, appSlug?: string) {
@@ -517,13 +518,15 @@ export class UsersService {
       admin_type: user.adminType,
       is_super_admin: user.adminType === 'SUPER_ADMIN',
       page_permissions: permissions,
-      catalog: ADMIN_PERMISSION_CATALOG,
+      catalog: PLATFORM_APP_ADMIN_PERMISSION_CATALOG,
+      role_catalog: PLATFORM_APP_ADMIN_ROLE_TEMPLATES,
     };
   }
 
   async listAdminPermissionGroups(userId: string, appSlug?: string) {
     const appId = await this.resolveAppId(appSlug);
     await this.ensureActiveUser(userId);
+    await this.assertCanManageAdmins(appId, userId);
 
     const rows = await (this.prisma.$queryRawUnsafe(
       `SELECT id, name, description, page_permissions, created_by_user_id, updated_by_user_id, created_at, updated_at
@@ -539,7 +542,7 @@ export class UsersService {
         id: row.id,
         name: row.name,
         description: row.description,
-        page_permissions: this.parseJsonArray(row.page_permissions),
+        page_permissions: normalizePlatformAppAdminPermissions(this.parseJsonArray(row.page_permissions)),
         created_by_user_id: row.created_by_user_id,
         updated_by_user_id: row.updated_by_user_id,
         created_at: row.created_at,
@@ -555,6 +558,8 @@ export class UsersService {
   ) {
     const appId = await this.resolveAppId(appSlug);
     await this.ensureActiveUser(userId);
+    await this.assertCanManageAdmins(appId, userId);
+    const permissions = this.normalizeAdminPagePermissions(payload.page_permissions);
 
     const rows = await (this.prisma.$queryRawUnsafe(
       `INSERT INTO admin_permission_groups (id, app_id, name, description, page_permissions, created_by_user_id, updated_by_user_id)
@@ -563,7 +568,7 @@ export class UsersService {
       appId,
       payload.name,
       payload.description || null,
-      JSON.stringify(payload.page_permissions || []),
+      JSON.stringify(permissions),
       userId,
     ) as Promise<AdminPermissionGroupRow[]>);
 
@@ -572,7 +577,7 @@ export class UsersService {
       id: group.id,
       name: group.name,
       description: group.description,
-      page_permissions: this.parseJsonArray(group.page_permissions),
+      page_permissions: normalizePlatformAppAdminPermissions(this.parseJsonArray(group.page_permissions)),
       created_by_user_id: group.created_by_user_id,
       updated_by_user_id: group.updated_by_user_id,
       created_at: group.created_at,
@@ -588,6 +593,7 @@ export class UsersService {
   ) {
     const appId = await this.resolveAppId(appSlug);
     await this.ensureActiveUser(userId);
+    await this.assertCanManageAdmins(appId, userId);
 
     const existing = await (this.prisma.$queryRawUnsafe(
       `SELECT id, name, description, page_permissions, created_by_user_id, updated_by_user_id, created_at, updated_at
@@ -600,7 +606,7 @@ export class UsersService {
       throw new NotFoundException('Permission group not found');
     }
 
-    const mergedPermissions = payload.page_permissions ?? this.parseJsonArray(existing[0].page_permissions);
+    const mergedPermissions = this.normalizeAdminPagePermissions(payload.page_permissions ?? existing[0].page_permissions);
     const rows = await (this.prisma.$queryRawUnsafe(
       `UPDATE admin_permission_groups
        SET name = $1, description = $2, page_permissions = $3::jsonb, updated_by_user_id = $4::uuid, updated_at = now()
@@ -619,7 +625,7 @@ export class UsersService {
       id: group.id,
       name: group.name,
       description: group.description,
-      page_permissions: this.parseJsonArray(group.page_permissions),
+      page_permissions: normalizePlatformAppAdminPermissions(this.parseJsonArray(group.page_permissions)),
       created_by_user_id: group.created_by_user_id,
       updated_by_user_id: group.updated_by_user_id,
       created_at: group.created_at,
@@ -627,8 +633,11 @@ export class UsersService {
     };
   }
 
-  async deleteAdminPermissionGroup(groupId: string, appSlug?: string) {
+  async deleteAdminPermissionGroup(groupId: string, appSlug?: string, userId?: string) {
     const appId = await this.resolveAppId(appSlug);
+    if (userId) {
+      await this.assertCanManageAdmins(appId, userId);
+    }
     await this.prisma.$executeRawUnsafe(
       `DELETE FROM admin_permission_groups WHERE id = $1::uuid AND app_id = $2::uuid`,
       groupId,
@@ -637,8 +646,11 @@ export class UsersService {
     return { message: 'Deleted' };
   }
 
-  async listSubAdmins(appSlug?: string) {
+  async listSubAdmins(appSlug?: string, userId?: string) {
     const appId = await this.resolveAppId(appSlug);
+    if (userId) {
+      await this.assertCanManageAdmins(appId, userId);
+    }
     const users = await this.prisma.user.findMany({
       where: {
         appId,
@@ -676,6 +688,7 @@ export class UsersService {
     appSlug?: string,
   ) {
     const appId = await this.resolveAppId(appSlug);
+    await this.assertCanManageAdmins(appId, currentUserId);
     const email = String(payload.email || '').trim().toLowerCase();
     if (!email) {
       throw new BadRequestException('Email is required');
@@ -722,7 +735,7 @@ export class UsersService {
       },
     });
 
-    await this.upsertAdminPagePermissions(appId, updated.id, payload.page_permissions, currentUserId);
+    await this.upsertAdminPagePermissions(appId, updated.id, this.normalizeAdminPagePermissions(payload.page_permissions), currentUserId);
     const pagePermissions = await this.fetchAdminAllowedPages(appId, updated.id);
     return {
       id: updated.id,
@@ -742,6 +755,7 @@ export class UsersService {
     appSlug?: string,
   ) {
     const appId = await this.resolveAppId(appSlug);
+    await this.assertCanManageAdmins(appId, currentUserId);
     const target = await this.prisma.user.findFirst({
       where: {
         id: subAdminId,
@@ -754,7 +768,7 @@ export class UsersService {
       throw new NotFoundException('Sub admin not found');
     }
 
-    await this.upsertAdminPagePermissions(appId, target.id, payload.page_permissions, currentUserId);
+    await this.upsertAdminPagePermissions(appId, target.id, this.normalizeAdminPagePermissions(payload.page_permissions), currentUserId);
     const pagePermissions = await this.fetchAdminAllowedPages(appId, target.id);
     return {
       id: target.id,
@@ -767,8 +781,11 @@ export class UsersService {
     };
   }
 
-  async deleteSubAdmin(subAdminId: string, appSlug?: string) {
+  async deleteSubAdmin(subAdminId: string, appSlug?: string, currentUserId?: string) {
     const appId = await this.resolveAppId(appSlug);
+    if (currentUserId) {
+      await this.assertCanManageAdmins(appId, currentUserId);
+    }
     const target = await this.prisma.user.findFirst({
       where: {
         id: subAdminId,
@@ -968,13 +985,62 @@ export class UsersService {
     return [];
   }
 
-  private async fetchAdminAllowedPages(appId: string, adminUserId: string): Promise<string[]> {
+  private normalizeAdminPagePermissions(value: unknown): string[] {
+    const invalid = findInvalidPlatformAppAdminPermissions(value);
+    if (invalid.length > 0) {
+      throw new BadRequestException(`invalid permission keys: ${invalid.join(', ')}`);
+    }
+    const permissions = normalizePlatformAppAdminPermissions(value);
+    const restricted = permissions.filter((permission) =>
+      PLATFORM_APP_ADMIN_PERMISSION_CATALOG.some((item) => item.key === permission && item.requires_super_admin),
+    );
+    if (restricted.length > 0) {
+      throw new BadRequestException(`permissions require SUPER_ADMIN and cannot be assigned to regular admins: ${restricted.join(', ')}`);
+    }
+    return permissions;
+  }
+
+  private async assertCanManageAdmins(appId: string, userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        appId,
+        role: 'ADMIN',
+        deletedAt: null,
+      },
+      select: { adminType: true },
+    });
+    if (!user) {
+      throw new ForbiddenException('admin role required');
+    }
+    if (user.adminType === 'SUPER_ADMIN') {
+      return;
+    }
+
+    const permissions = await this.fetchAdminAllowedPages(appId, userId, { allowRestricted: true });
+    if (permissions.includes('app.admins.manage')) {
+      return;
+    }
+    throw new ForbiddenException('app admin management permission required');
+  }
+
+  private async fetchAdminAllowedPages(
+    appId: string,
+    adminUserId: string,
+    options: { allowRestricted?: boolean } = {},
+  ): Promise<string[]> {
     const rows = await (this.prisma.$queryRawUnsafe(
       `SELECT id, allowed_pages FROM admin_page_permissions WHERE app_id = $1::uuid AND admin_user_id = $2::uuid LIMIT 1`,
       appId,
       adminUserId,
     ) as Promise<AdminPagePermissionRow[]>);
-    return this.parseJsonArray(rows[0]?.allowed_pages);
+    const normalized = normalizePlatformAppAdminPermissions(this.parseJsonArray(rows[0]?.allowed_pages));
+    if (options.allowRestricted) {
+      return normalized;
+    }
+    return normalized.filter((permission) =>
+      !PLATFORM_APP_ADMIN_PERMISSION_CATALOG.some((item) => item.key === permission && item.requires_super_admin),
+    );
   }
 
   private async upsertAdminPagePermissions(
@@ -983,6 +1049,7 @@ export class UsersService {
     pagePermissions: string[],
     actorUserId: string,
   ) {
+    const normalized = this.normalizeAdminPagePermissions(pagePermissions);
     const existing = await (this.prisma.$queryRawUnsafe(
       `SELECT id, allowed_pages FROM admin_page_permissions WHERE app_id = $1::uuid AND admin_user_id = $2::uuid LIMIT 1`,
       appId,
@@ -993,7 +1060,7 @@ export class UsersService {
         `UPDATE admin_page_permissions
          SET allowed_pages = $1::jsonb, updated_by_user_id = $2::uuid, updated_at = now()
          WHERE id = $3::uuid`,
-        JSON.stringify(pagePermissions || []),
+        JSON.stringify(normalized),
         actorUserId,
         existing[0].id,
       );
@@ -1003,7 +1070,7 @@ export class UsersService {
          VALUES (gen_random_uuid(), $1::uuid, $2::uuid, $3::jsonb, $4::uuid, $4::uuid)`,
         appId,
         adminUserId,
-        JSON.stringify(pagePermissions || []),
+        JSON.stringify(normalized),
         actorUserId,
       );
     }

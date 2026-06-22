@@ -265,14 +265,14 @@ export class UsersController {
   @UseGuards(AdminRoleGuard)
   @ApiOperation({ summary: '删除权限组' })
   async deletePermissionGroup(@Req() req: any, @Param('app') app: string, @Param('group_id') groupId: string) {
-    return this.usersService.deleteAdminPermissionGroup(groupId, app || req.user.appSlug);
+    return this.usersService.deleteAdminPermissionGroup(groupId, app || req.user.appSlug, req.user.id);
   }
 
   @Get('admin/sub-admins')
   @UseGuards(AdminRoleGuard)
   @ApiOperation({ summary: '子管理员列表' })
   async listSubAdmins(@Req() req: any, @Param('app') app: string) {
-    return this.usersService.listSubAdmins(app || req.user.appSlug);
+    return this.usersService.listSubAdmins(app || req.user.appSlug, req.user.id);
   }
 
   @Post('admin/sub-admins/assign')
@@ -302,7 +302,7 @@ export class UsersController {
   @UseGuards(AdminRoleGuard)
   @ApiOperation({ summary: '删除子管理员' })
   async deleteSubAdmin(@Req() req: any, @Param('app') app: string, @Param('sub_admin_id') subAdminId: string) {
-    return this.usersService.deleteSubAdmin(subAdminId, app || req.user.appSlug);
+    return this.usersService.deleteSubAdmin(subAdminId, app || req.user.appSlug, req.user.id);
   }
 
   @Post('redeem')

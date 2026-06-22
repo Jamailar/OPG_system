@@ -221,6 +221,67 @@ model AdminPermissionGroup {
   @@map("admin_permission_groups")
 }
 
+model AdminRole {
+  id              String   @id @default(uuid())
+  appId           String?  @map("app_id")
+  key             String   @unique @db.VarChar(120)
+  name            String   @db.VarChar(120)
+  description     String?
+  isSystem        Boolean  @default(false) @map("is_system")
+  status          String   @default("ACTIVE") @db.VarChar(16)
+  createdByUserId String?  @map("created_by_user_id")
+  updatedByUserId String?  @map("updated_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([appId, status, createdAt])
+  @@map("admin_roles")
+}
+
+model AdminRolePermission {
+  id            String   @id @default(uuid())
+  roleId        String   @map("role_id")
+  permissionKey String   @map("permission_key") @db.VarChar(160)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([roleId, permissionKey])
+  @@index([permissionKey])
+  @@map("admin_role_permissions")
+}
+
+model AdminUserRoleAssignment {
+  id              String   @id @default(uuid())
+  appId           String   @map("app_id")
+  adminUserId     String   @map("admin_user_id")
+  roleId          String   @map("role_id")
+  createdByUserId String?  @map("created_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@unique([appId, adminUserId, roleId])
+  @@index([appId, adminUserId])
+  @@index([roleId])
+  @@map("admin_user_role_assignments")
+}
+
+model AdminUserPermissionOverride {
+  id              String    @id @default(uuid())
+  appId           String    @map("app_id")
+  adminUserId     String    @map("admin_user_id")
+  permissionKey   String    @map("permission_key") @db.VarChar(160)
+  effect          String    @default("ALLOW") @db.VarChar(16)
+  reason          String?
+  expiresAt       DateTime? @map("expires_at")
+  createdByUserId String?   @map("created_by_user_id")
+  updatedByUserId String?   @map("updated_by_user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([appId, adminUserId, permissionKey, effect])
+  @@index([appId, adminUserId])
+  @@index([expiresAt])
+  @@map("admin_user_permission_overrides")
+}
+
 model AdminNotificationChannel {
   id              String   @id @default(uuid())
   appId           String?  @map("app_id")

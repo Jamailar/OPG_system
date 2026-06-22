@@ -33,6 +33,7 @@ import {
   PlatformEmailSenderItem,
   PlatformEmailTemplateItem,
   PlatformPermissionCatalogItem,
+  PlatformAdminRoleItem,
   PlatformMyAppAdminPermissions,
   PlatformSmsProviderItem,
   PlatformSmsSignatureItem,
@@ -70,6 +71,7 @@ interface AdminCreateForm {
   password: string;
   display_name: string;
   admin_type: 'SUPER_ADMIN' | 'ADMIN';
+  role_keys: string[];
   page_permissions: string[];
 }
 
@@ -172,6 +174,7 @@ const EMPTY_ADMIN_FORM: AdminCreateForm = {
   password: '',
   display_name: '',
   admin_type: 'ADMIN',
+  role_keys: ['readonly'],
   page_permissions: [],
 };
 
@@ -663,6 +666,7 @@ export default function TenantWorkspace({ appIdOverride }: TenantWorkspaceProps)
   const [stats, setStats] = useState<PlatformTenantStats | null>(null);
   const [admins, setAdmins] = useState<PlatformTenantAdminItem[]>([]);
   const [permissionCatalog, setPermissionCatalog] = useState<PlatformPermissionCatalogItem[]>([]);
+  const [roleCatalog, setRoleCatalog] = useState<PlatformAdminRoleItem[]>([]);
   const [adminAccess, setAdminAccess] = useState<PlatformMyAppAdminPermissions | null>(null);
   const [createForm, setCreateForm] = useState<AdminCreateForm>(EMPTY_ADMIN_FORM);
   const [createSaving, setCreateSaving] = useState(false);
@@ -673,6 +677,7 @@ export default function TenantWorkspace({ appIdOverride }: TenantWorkspaceProps)
   });
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [permissionEditorAdminId, setPermissionEditorAdminId] = useState('');
+  const [permissionEditorRoleKeys, setPermissionEditorRoleKeys] = useState<string[]>([]);
   const [permissionKeys, setPermissionKeys] = useState<string[]>([]);
   const [permissionSaving, setPermissionSaving] = useState(false);
 
@@ -804,28 +809,92 @@ export default function TenantWorkspace({ appIdOverride }: TenantWorkspaceProps)
   const isAppSuperAdmin = Boolean(adminAccess?.is_super_admin);
   const canManagePlatformAppSettings = runtimeContext.isPlatformPortal && isAppSuperAdmin;
   const hasAppPermission = (key: string) => isAppSuperAdmin || Boolean(adminAccess?.page_permissions?.includes(key));
-  const canUseRedeemRead = hasAppPermission('app_redeem_read') || hasAppPermission('app_redeem_products_manage');
-  const canManageNotifications = hasAppPermission('app_notifications_manage');
+  const canViewBuildData = hasAppPermission('app.build.read');
+  const canViewAnalytics = hasAppPermission('app.analytics.read');
+  const canViewAiUsage = hasAppPermission('app.ai.usage.read');
+  const canManageAiRouting = runtimeContext.isPlatformPortal && (isAppSuperAdmin || hasAppPermission('app.ai.routing.write'));
+  const canManageAiPoints = hasAppPermission('app.ai.points.grant');
+  const canViewLogs = hasAppPermission('app.logs.read');
+  const canViewApiDocs = hasAppPermission('app.api_docs.read');
+  const canManageDevelopers = hasAppPermission('app.developers.manage');
+  const canViewSite = hasAppPermission('app.site.read') || hasAppPermission('app.site.write');
+  const canViewEmail = hasAppPermission('app.email.read') || hasAppPermission('app.email.write') || hasAppPermission('app.email.send');
+  const canViewNotifications = hasAppPermission('app.notifications.read') || hasAppPermission('app.notifications.manage') || hasAppPermission('app_notifications_manage');
+  const canViewFeedback = hasAppPermission('app.feedback.read') || hasAppPermission('app.feedback.review') || hasAppPermission('app.feedback.reward');
+  const canReviewFeedback = hasAppPermission('app.feedback.review') || hasAppPermission('app.feedback.reward');
+  const canRewardFeedback = hasAppPermission('app.feedback.reward');
+  const canViewAcquisition = hasAppPermission('app.acquisition.read') || hasAppPermission('app.acquisition.write');
+  const canManageProducts = hasAppPermission('app.products.write');
+  const canCreateRedeemCodes = hasAppPermission('app.redeem.codes.create');
+  const canVoidRedeemCodes = hasAppPermission('app.redeem.codes.void');
+  const canRevokeRedeemRedemptions = hasAppPermission('app.redeem.redemptions.revoke');
+  const canDistributeRedeemPackages = hasAppPermission('app.redeem.packages.distribute');
+  const canRefundOrders = hasAppPermission('app.orders.refund');
+  const canUseRedeemRead =
+    hasAppPermission('app.products.read') ||
+    hasAppPermission('app.products.write') ||
+    hasAppPermission('app.orders.read') ||
+    hasAppPermission('app.orders.refund') ||
+    hasAppPermission('app.redeem.codes.read') ||
+    hasAppPermission('app.redeem.codes.create');
   const visibleWorkspaceNav = useMemo(() => {
     if (!adminAccess) return WORKSPACE_NAV.filter((item) => item.key === 'overview');
     return WORKSPACE_NAV.filter((item) => {
       if (item.key === 'overview') return true;
-      if (item.key === 'build-data') return isAppSuperAdmin;
-      if (item.key === 'analytics') return hasAppPermission('app_analytics_read');
-      if (item.key === 'ai-usage') return hasAppPermission('app_ai_usage_read');
-      if (item.key === 'logs') return hasAppPermission('app_logs_read');
-      if (item.key === 'api-docs') return hasAppPermission('app_api_docs_read');
-      if (item.key === 'developers') return hasAppPermission('app_api_docs_read');
+      if (item.key === 'build-data') return canViewBuildData;
+      if (item.key === 'analytics') return canViewAnalytics;
+      if (item.key === 'ai-usage') return canViewAiUsage;
+      if (item.key === 'logs') return canViewLogs;
+      if (item.key === 'api-docs') return canViewApiDocs;
+      if (item.key === 'developers') return canViewApiDocs || canManageDevelopers;
       if (item.key === 'admins') return isAppSuperAdmin;
-      if (item.key === 'ai-routing') return canManagePlatformAppSettings;
-      if (item.key === 'email') return hasAppPermission('app_email_manage');
-      if (item.key === 'notifications') return canManageNotifications;
-      if (item.key === 'feedback') return hasAppPermission('app_feedback_manage');
-      if (item.key === 'acquisition') return hasAppPermission('app_acquisition_manage');
-      if (item.key === 'redeem') return hasAppPermission('app_redeem_read') || hasAppPermission('app_redeem_products_manage');
+      if (item.key === 'ai-routing') return canManageAiRouting;
+      if (item.key === 'email') return canViewEmail;
+      if (item.key === 'notifications') return canViewNotifications;
+      if (item.key === 'feedback') return canViewFeedback;
+      if (item.key === 'acquisition') return canViewAcquisition;
+      if (item.key === 'redeem') return canUseRedeemRead;
       return false;
     });
-  }, [adminAccess, isAppSuperAdmin, canManagePlatformAppSettings, canManageNotifications]);
+  }, [adminAccess, isAppSuperAdmin, canManageAiRouting, canUseRedeemRead]);
+
+  const activeRoleCatalog = useMemo(
+    () => roleCatalog.filter((item) => item.status !== 'INACTIVE'),
+    [roleCatalog],
+  );
+
+  const assignablePermissionCatalog = useMemo(
+    () => permissionCatalog.filter((item) => !item.requires_super_admin),
+    [permissionCatalog],
+  );
+
+  const permissionGroups = useMemo(() => {
+    const groups = new Map<string, { key: string; name: string; items: PlatformPermissionCatalogItem[] }>();
+    assignablePermissionCatalog.forEach((item) => {
+      const groupKey = item.module || item.module_name || 'other';
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, { key: groupKey, name: item.module_name || item.module || '其他', items: [] });
+      }
+      groups.get(groupKey)?.items.push(item);
+    });
+    return Array.from(groups.values());
+  }, [assignablePermissionCatalog]);
+
+  const createRolePermissionKeys = useMemo(() => {
+    const keys = new Set<string>();
+    activeRoleCatalog
+      .filter((role) => createForm.role_keys.includes(role.key) || createForm.role_keys.includes(role.id))
+      .forEach((role) => (role.permission_keys || []).forEach((key) => keys.add(key)));
+    return keys;
+  }, [activeRoleCatalog, createForm.role_keys]);
+
+  const editorRolePermissionKeys = useMemo(() => {
+    const keys = new Set<string>();
+    activeRoleCatalog
+      .filter((role) => permissionEditorRoleKeys.includes(role.key) || permissionEditorRoleKeys.includes(role.id))
+      .forEach((role) => (role.permission_keys || []).forEach((key) => keys.add(key)));
+    return keys;
+  }, [activeRoleCatalog, permissionEditorRoleKeys]);
 
   const defaultModelSlotByKey = useMemo(() => {
     const map = new Map<PlatformAppAiDefaultModelSlotKey, PlatformAppAiDefaultModelSlotItem>();
@@ -1293,9 +1362,14 @@ export default function TenantWorkspace({ appIdOverride }: TenantWorkspaceProps)
       ]);
       const access = pickApiData<PlatformMyAppAdminPermissions>(accessResp) || accessResp;
       const accessIsSuper = Boolean(access?.is_super_admin);
+      const accessPermissions = Array.isArray(access?.page_permissions) ? access.page_permissions : [];
+      const accessHasPermission = (key: string) => accessIsSuper || accessPermissions.includes(key);
       const canUseGlobalPlatformSettings = runtimeContext.isPlatformPortal && accessIsSuper;
+      const canLoadAiRouting = runtimeContext.isPlatformPortal && (accessIsSuper || accessHasPermission('app.ai.routing.write'));
+      const canLoadAiPoints = accessIsSuper || accessHasPermission('app.ai.points.grant');
       setAdminAccess(access);
       setPermissionCatalog(access?.permission_catalog || []);
+      setRoleCatalog(access?.role_catalog || []);
 
       const detail = pickApiData<PlatformAppItem>(detailResp) || null;
       setAppDetail(detail);
@@ -1325,17 +1399,19 @@ export default function TenantWorkspace({ appIdOverride }: TenantWorkspaceProps)
         const adminsPayload = pickApiData<{
           items: PlatformTenantAdminItem[];
           permission_catalog?: PlatformPermissionCatalogItem[];
+          role_catalog?: PlatformAdminRoleItem[];
         }>(adminsResp);
         adminItems = adminsPayload?.items || [];
         setAdmins(adminItems);
         setPermissionCatalog(adminsPayload?.permission_catalog || access?.permission_catalog || []);
+        setRoleCatalog(adminsPayload?.role_catalog || access?.role_catalog || []);
       } else {
         setAdmins([]);
       }
 
-      if (canUseGlobalPlatformSettings) {
+      if (canLoadAiRouting) {
         const [aiSourcesResp, modelRoutesResp, defaultModelSlotsResp] = await Promise.all([
-          platformApi.listGlobalAiSources(),
+          accessIsSuper ? platformApi.listGlobalAiSources() : Promise.resolve({ code: 0, data: { items: [] } }),
           platformApi.listAppAiModelRoutes(appId),
           platformApi.listAppAiDefaultModelSlots(appId),
         ]);
@@ -1365,7 +1441,7 @@ export default function TenantWorkspace({ appIdOverride }: TenantWorkspaceProps)
         setDefaultModelSlots([]);
       }
 
-      if (accessIsSuper) {
+      if (canLoadAiPoints) {
         const pointsSettingsResp = await platformApi.getAppAiPointsSettings(appId);
         const pointsSettings = pickApiData<PlatformAppAiPointsSettings>(pointsSettingsResp) || null;
         setAiPointsSettings(pointsSettings);
@@ -1470,7 +1546,10 @@ export default function TenantWorkspace({ appIdOverride }: TenantWorkspaceProps)
         const editable = adminItems.find((item) => item.admin_type === 'ADMIN');
         if (editable) {
           setPermissionEditorAdminId((prev) => prev || editable.id);
-          setPermissionKeys(editable.page_permissions || []);
+          const assignedRoleKeys = (editable.role_assignments || []).map((role) => role.role_key).filter(Boolean);
+          const overrides = (editable.permission_overrides || []).map((item) => item.permission_key).filter(Boolean);
+          setPermissionEditorRoleKeys(assignedRoleKeys);
+          setPermissionKeys(assignedRoleKeys.length || overrides.length ? overrides : editable.page_permissions || []);
         }
       }
     } catch (error: any) {
@@ -1485,21 +1564,21 @@ export default function TenantWorkspace({ appIdOverride }: TenantWorkspaceProps)
   }, [appId]);
 
   useEffect(() => {
-    if (!appId || activeSection !== 'feedback' || !hasAppPermission('app_feedback_manage')) return;
+    if (!appId || activeSection !== 'feedback' || !canViewFeedback) return;
     loadFeedbackData().catch((error: any) => {
       setMessage({ type: 'error', text: pickApiErrorMessage(error, '加载用户反馈失败') });
     });
   }, [appId, activeSection, feedbackPage, feedbackStatusFilter, feedbackPriorityFilter, feedbackQuery, adminAccess]);
 
   useEffect(() => {
-    if (!appId || activeSection !== 'acquisition' || !hasAppPermission('app_acquisition_manage')) return;
+    if (!appId || activeSection !== 'acquisition' || !canViewAcquisition) return;
     loadAcquisitionData().catch((error: any) => {
       setMessage({ type: 'error', text: pickApiErrorMessage(error, '加载用户来源失败') });
     });
   }, [appId, activeSection, acquisitionPage, acquisitionSourceFilter, acquisitionQuery, adminAccess]);
 
   useEffect(() => {
-    if (!appId || activeSection !== 'site' || !hasAppPermission('app_site_manage')) return;
+    if (!appId || activeSection !== 'site' || !canViewSite) return;
     loadSiteMessages().catch((error: any) => {
       setMessage({ type: 'error', text: pickApiErrorMessage(error, '加载官网消息失败') });
     });
@@ -1515,14 +1594,14 @@ export default function TenantWorkspace({ appIdOverride }: TenantWorkspaceProps)
   ]);
 
   useEffect(() => {
-    if (!appId || activeSection !== 'site' || !hasAppPermission('app_site_manage')) return;
+    if (!appId || activeSection !== 'site' || !canViewSite) return;
     loadSiteCookieConsents().catch((error: any) => {
       setMessage({ type: 'error', text: pickApiErrorMessage(error, '加载 Cookie 偏好失败') });
     });
   }, [appId, activeSection, siteCookieConsentPage, siteCookieConsentRegionFilter, adminAccess]);
 
   useEffect(() => {
-    if (!appId || activeSection !== 'email' || !hasAppPermission('app_email_manage')) return;
+    if (!appId || activeSection !== 'email' || !canViewEmail) return;
     loadEmailData().catch((error: any) => {
       setMessage({ type: 'error', text: pickApiErrorMessage(error, '加载邮件数据失败') });
     });
@@ -1567,7 +1646,10 @@ export default function TenantWorkspace({ appIdOverride }: TenantWorkspaceProps)
     if (!permissionEditorAdminId) return;
     const matched = admins.find((item) => item.id === permissionEditorAdminId);
     if (matched) {
-      setPermissionKeys(matched.page_permissions || []);
+      const assignedRoleKeys = (matched.role_assignments || []).map((role) => role.role_key).filter(Boolean);
+      const overrides = (matched.permission_overrides || []).map((item) => item.permission_key).filter(Boolean);
+      setPermissionEditorRoleKeys(assignedRoleKeys);
+      setPermissionKeys(assignedRoleKeys.length || overrides.length ? overrides : matched.page_permissions || []);
     }
   }, [permissionEditorAdminId, admins]);
 
@@ -1584,6 +1666,20 @@ export default function TenantWorkspace({ appIdOverride }: TenantWorkspaceProps)
         page_permissions: exists ? prev.page_permissions.filter((item) => item !== key) : [...prev.page_permissions, key],
       };
     });
+  };
+
+  const toggleCreateRole = (key: string) => {
+    setCreateForm((prev) => {
+      const exists = prev.role_keys.includes(key);
+      return {
+        ...prev,
+        role_keys: exists ? prev.role_keys.filter((item) => item !== key) : [...prev.role_keys, key],
+      };
+    });
+  };
+
+  const togglePermissionEditorRole = (key: string) => {
+    setPermissionEditorRoleKeys((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
   };
 
   const togglePermissionEditorKey = (key: string) => {
@@ -1668,7 +1764,8 @@ export default function TenantWorkspace({ appIdOverride }: TenantWorkspaceProps)
         password: createForm.password,
         display_name: createForm.display_name || undefined,
         admin_type: createForm.admin_type,
-        page_permissions: createForm.admin_type === 'SUPER_ADMIN' ? [] : createForm.page_permissions,
+        role_keys: createForm.admin_type === 'SUPER_ADMIN' ? [] : createForm.role_keys,
+        permission_overrides: createForm.admin_type === 'SUPER_ADMIN' ? [] : createForm.page_permissions,
       });
       setCreateForm(EMPTY_ADMIN_FORM);
       setMessage({ type: 'success', text: '管理员账号保存成功' });
@@ -1817,7 +1914,8 @@ export default function TenantWorkspace({ appIdOverride }: TenantWorkspaceProps)
     setMessage(null);
     try {
       await platformApi.updateAppAdminPermissions(appId, permissionEditorAdminId, {
-        page_permissions: permissionKeys,
+        role_keys: permissionEditorRoleKeys,
+        permission_overrides: permissionKeys,
       });
       setMessage({ type: 'success', text: '管理员权限已更新' });
       await loadData();
@@ -3264,8 +3362,8 @@ export default function TenantWorkspace({ appIdOverride }: TenantWorkspaceProps)
         </>
       )}
 
-      {isAppSuperAdmin && renderAiPointsSettingsCard()}
-      {isAppSuperAdmin && renderManualGrantAiPointsCard()}
+      {canManageAiPoints && renderAiPointsSettingsCard()}
+      {canManageAiPoints && renderManualGrantAiPointsCard()}
     </div>
   );
 
@@ -3421,6 +3519,64 @@ const agents = await opg.agents.list();`}</pre>
     );
   };
 
+  const renderRoleSelector = (selectedKeys: string[], onToggle: (key: string) => void) => (
+    <div className="platform-chip-row">
+      {activeRoleCatalog.map((role) => {
+        const active = selectedKeys.includes(role.key) || selectedKeys.includes(role.id);
+        return (
+          <button
+            key={role.id || role.key}
+            type="button"
+            className={`platform-chip ${active ? 'active' : ''}`}
+            onClick={() => onToggle(role.key)}
+            title={role.description || role.name}
+          >
+            {role.name}
+          </button>
+        );
+      })}
+      {!activeRoleCatalog.length && <span className="status-tag muted">暂无角色模板</span>}
+    </div>
+  );
+
+  const renderPermissionMatrix = (
+    selectedKeys: string[],
+    coveredKeys: Set<string>,
+    onToggle: (key: string) => void,
+  ) => (
+    <div style={{ display: 'grid', gap: 12 }}>
+      {permissionGroups.map((group) => (
+        <div key={group.key} className="platform-detail-block">
+          <h4>{group.name}</h4>
+          <div className="platform-permission-grid">
+            {group.items.map((item) => {
+              const covered = coveredKeys.has(item.key);
+              return (
+                <label key={item.key} className="platform-permission-item" title={covered ? '已由角色模板包含' : item.description}>
+                  <input
+                    type="checkbox"
+                    checked={covered || selectedKeys.includes(item.key)}
+                    disabled={covered}
+                    onChange={() => onToggle(item.key)}
+                  />
+                  <span>{item.name}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      {!permissionGroups.length && <span className="status-tag muted">暂无可分配权限</span>}
+    </div>
+  );
+
+  const formatAdminRoles = (admin: PlatformTenantAdminItem) => {
+    if (admin.admin_type === 'SUPER_ADMIN') return '全部权限';
+    const roleNames = (admin.role_assignments || []).map((item) => item.role_name).filter(Boolean);
+    if (roleNames.length) return roleNames.join('、');
+    return admin.page_permissions?.length ? '自定义' : '-';
+  };
+
   const renderAdmins = () => (
     <div className="platform-page">
       <div className="platform-grid-two tenants-layout">
@@ -3469,21 +3625,16 @@ const agents = await opg.agents.list();`}</pre>
             </div>
 
             {createForm.admin_type === 'ADMIN' && (
-              <div className="form-group platform-form-span-2">
-                <label>页面权限</label>
-                <div className="platform-permission-grid">
-                  {permissionCatalog.map((item) => (
-                    <label key={item.key} className="platform-permission-item">
-                      <input
-                        type="checkbox"
-                        checked={createForm.page_permissions.includes(item.key)}
-                        onChange={() => toggleCreatePermission(item.key)}
-                      />
-                      <span>{item.name}</span>
-                    </label>
-                  ))}
+              <>
+                <div className="form-group platform-form-span-2">
+                  <label>角色模板</label>
+                  {renderRoleSelector(createForm.role_keys, toggleCreateRole)}
                 </div>
-              </div>
+                <div className="form-group platform-form-span-2">
+                  <label>额外权限</label>
+                  {renderPermissionMatrix(createForm.page_permissions, createRolePermissionKeys, toggleCreatePermission)}
+                </div>
+              </>
             )}
 
             <div className="platform-form-actions platform-form-span-2">
@@ -3558,17 +3709,13 @@ const agents = await opg.agents.list();`}</pre>
           </div>
           {selectedAdmin?.admin_type === 'ADMIN' && (
             <>
-              <div className="platform-permission-grid">
-                {permissionCatalog.map((item) => (
-                  <label key={item.key} className="platform-permission-item">
-                    <input
-                      type="checkbox"
-                      checked={permissionKeys.includes(item.key)}
-                      onChange={() => togglePermissionEditorKey(item.key)}
-                    />
-                    <span>{item.name}</span>
-                  </label>
-                ))}
+              <div className="form-group">
+                <label>角色模板</label>
+                {renderRoleSelector(permissionEditorRoleKeys, togglePermissionEditorRole)}
+              </div>
+              <div className="form-group">
+                <label>额外权限</label>
+                {renderPermissionMatrix(permissionKeys, editorRolePermissionKeys, togglePermissionEditorKey)}
               </div>
               <div className="platform-form-actions" style={{ marginTop: 12 }}>
                 <button className="btn" disabled={permissionSaving} onClick={handleUpdatePermissions}>
@@ -3589,6 +3736,7 @@ const agents = await opg.agents.list();`}</pre>
                 <th>邮箱</th>
                 <th>显示名</th>
                 <th>类型</th>
+                <th>角色</th>
                 <th>状态</th>
                 <th>最近登录</th>
                 <th>操作</th>
@@ -3600,6 +3748,7 @@ const agents = await opg.agents.list();`}</pre>
                   <td>{item.email}</td>
                   <td>{item.display_name || '-'}</td>
                   <td>{item.admin_type}</td>
+                  <td>{formatAdminRoles(item)}</td>
                   <td>
                     <span className={`status-tag ${item.is_active ? 'success' : 'warning'}`}>
                       {item.is_active ? 'ACTIVE' : 'INACTIVE'}
@@ -3622,7 +3771,7 @@ const agents = await opg.agents.list();`}</pre>
               ))}
               {!admins.length && (
                 <tr>
-                  <td colSpan={6}>当前租户暂无管理员</td>
+                  <td colSpan={7}>当前租户暂无管理员</td>
                 </tr>
               )}
             </tbody>
@@ -4457,7 +4606,7 @@ const agents = await opg.agents.list();`}</pre>
                   <select
                     value={selectedFeedback.status}
                     onChange={(event) => void updateFeedback({ status: event.target.value as PlatformAppFeedbackItem['status'] })}
-                    disabled={feedbackActingId === selectedFeedback.id}
+                    disabled={!canReviewFeedback || feedbackActingId === selectedFeedback.id}
                   >
                     <option value="pending">待处理</option>
                     <option value="triaged">已确认</option>
@@ -4471,7 +4620,7 @@ const agents = await opg.agents.list();`}</pre>
                   <select
                     value={selectedFeedback.priority}
                     onChange={(event) => void updateFeedback({ priority: event.target.value as PlatformAppFeedbackItem['priority'] })}
-                    disabled={feedbackActingId === selectedFeedback.id}
+                    disabled={!canReviewFeedback || feedbackActingId === selectedFeedback.id}
                   >
                     <option value="urgent">紧急</option>
                     <option value="high">高</option>
@@ -4480,7 +4629,7 @@ const agents = await opg.agents.list();`}</pre>
                   </select>
                 </div>
               </div>
-              {isAppSuperAdmin && ['pending', 'triaged', 'in_progress'].includes(selectedFeedback.status) ? (
+              {canRewardFeedback && ['pending', 'triaged', 'in_progress'].includes(selectedFeedback.status) ? (
                 <div className="tenant-feedback-review-actions">
                   <button className="btn btn-secondary btn-sm" type="button" onClick={() => void reviewFeedback(selectedFeedback.id, 'useless')}>
                     无效
@@ -4500,7 +4649,7 @@ const agents = await opg.agents.list();`}</pre>
                   className="btn btn-secondary btn-sm"
                   type="button"
                   onClick={() => void updateFeedback({ note: feedbackNote })}
-                  disabled={feedbackActingId === selectedFeedback.id}
+                  disabled={!canReviewFeedback || feedbackActingId === selectedFeedback.id}
                 >
                   保存备注
                 </button>
@@ -5607,12 +5756,12 @@ const agents = await opg.agents.list();`}</pre>
                   <td>{item.updated_at ? new Date(item.updated_at).toLocaleString() : '-'}</td>
                   <td>
                     <div className="btn-group rp-actions">
-                      {isAppSuperAdmin && (
+                      {canDistributeRedeemPackages && (
                         <button className="btn btn-secondary btn-sm" onClick={() => distributePackageToUser(item)}>
                           分发
                         </button>
                       )}
-                      {hasAppPermission('app_redeem_products_manage') && (
+                      {canManageProducts && (
                         <>
                           <button className="btn btn-secondary btn-sm" onClick={() => editPackage(item)}>
                             编辑
@@ -5626,7 +5775,7 @@ const agents = await opg.agents.list();`}</pre>
                         </>
                       )}
                     </div>
-                    {payment && isAppSuperAdmin && (
+                    {payment && canManageProducts && (
                       <div className="btn-group rp-test-actions">
                         {paymentType === 'ONE_TIME' && (
                           <>
@@ -5737,7 +5886,7 @@ const agents = await opg.agents.list();`}</pre>
                     <td>{item.payment_type || '-'}</td>
                     <td>{item.subject || '-'}</td>
                     <td>
-                      {isAppSuperAdmin && (
+                      {canRefundOrders && (
                         <button
                           className="btn btn-secondary btn-sm"
                           disabled={!refundable || paymentOrderRefundingId === item.id}
@@ -5847,7 +5996,7 @@ const agents = await opg.agents.list();`}</pre>
       <div className="platform-section-head">
         <h3>兑换码列表</h3>
         <div className="btn-group">
-          {isAppSuperAdmin && (
+          {canVoidRedeemCodes && (
             <form className="redeem-code-void-form" onSubmit={voidCodeFromInput}>
               <input
                 type="text"
@@ -5907,7 +6056,7 @@ const agents = await opg.agents.list();`}</pre>
                 <td>{item.created_at ? new Date(item.created_at).toLocaleString() : '-'}</td>
                 <td>
                   <div className="btn-group">
-                    {isAppSuperAdmin && (
+                    {canVoidRedeemCodes && (
                       <button className="btn btn-danger btn-sm" onClick={() => voidCode(item.code)} disabled={item.status !== 'active'}>
                         作废
                       </button>
@@ -6003,7 +6152,7 @@ const agents = await opg.agents.list();`}</pre>
                     )}
                   </td>
                   <td>
-                    {isAppSuperAdmin && (
+                    {canRevokeRedeemRedemptions && (
                       <button
                         className="btn btn-danger btn-sm"
                         disabled={revoked || redeemRedemptionRevokingId === item.id}
@@ -6052,19 +6201,19 @@ const agents = await opg.agents.list();`}</pre>
           <div className="btn-group">
             {redeemSubPage === 'products' && (
               <>
-                {hasAppPermission('app_redeem_products_manage') && (
+                {canManageProducts && (
                   <button className="btn btn-sm" type="button" onClick={openCreatePackagePage}>
                     新建产品
                   </button>
                 )}
-                {isAppSuperAdmin && (
+                {canCreateRedeemCodes && (
                   <button className="btn btn-secondary btn-sm" type="button" onClick={() => goRedeemSubPage('code-create')}>
                     创建兑换码
                   </button>
                 )}
               </>
             )}
-            {redeemSubPage === 'code-batches' && isAppSuperAdmin && (
+            {redeemSubPage === 'code-batches' && canCreateRedeemCodes && (
               <button className="btn btn-sm" type="button" onClick={() => goRedeemSubPage('code-create')}>
                 创建兑换码
               </button>
@@ -6083,8 +6232,8 @@ const agents = await opg.agents.list();`}</pre>
         </div>
         <div className="btn-group">
           {REDEEM_SUB_NAV.filter((item) => {
-            if (item.key === 'product-create') return hasAppPermission('app_redeem_products_manage');
-            if (item.key === 'code-create') return isAppSuperAdmin;
+            if (item.key === 'product-create') return canManageProducts;
+            if (item.key === 'code-create') return canCreateRedeemCodes;
             return true;
           }).map((item) => (
             <button
@@ -6100,10 +6249,10 @@ const agents = await opg.agents.list();`}</pre>
       </section>
 
       {redeemSubPage === 'products' && renderRedeemProducts()}
-      {redeemSubPage === 'product-create' && hasAppPermission('app_redeem_products_manage') && renderPackageEditor()}
+      {redeemSubPage === 'product-create' && canManageProducts && renderPackageEditor()}
       {redeemSubPage === 'orders' && renderRedeemOrders()}
       {redeemSubPage === 'code-batches' && renderRedeemBatches()}
-      {redeemSubPage === 'code-create' && isAppSuperAdmin && renderCodeBatchCreate()}
+      {redeemSubPage === 'code-create' && canCreateRedeemCodes && renderCodeBatchCreate()}
       {redeemSubPage === 'codes' && renderRedeemCodes()}
       {redeemSubPage === 'redemptions' && renderRedeemRedemptions()}
     </div>

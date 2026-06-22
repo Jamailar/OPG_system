@@ -1892,8 +1892,45 @@ export interface PlatformTenantUsersAnalytics {
 
 export interface PlatformPermissionCatalogItem {
   key: string;
+  module?: string;
+  module_name?: string;
   name: string;
   description: string;
+  level?: 'read' | 'write' | 'manage' | 'sensitive';
+  action?: string;
+  sensitive?: boolean;
+  requires_super_admin?: boolean;
+}
+
+export interface PlatformAdminRoleItem {
+  id: string;
+  app_id?: string | null;
+  key: string;
+  name: string;
+  description?: string | null;
+  is_system: boolean;
+  status: string;
+  permission_keys: string[];
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface PlatformAdminRoleAssignmentItem {
+  role_id: string;
+  role_key: string;
+  role_name: string;
+  is_system: boolean;
+  permission_keys: string[];
+  created_at?: string;
+}
+
+export interface PlatformAdminPermissionOverrideItem {
+  permission_key: string;
+  effect: 'ALLOW';
+  reason?: string | null;
+  expires_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface PlatformTenantAdminItem {
@@ -1905,6 +1942,8 @@ export interface PlatformTenantAdminItem {
   admin_type: 'SUPER_ADMIN' | 'ADMIN';
   is_active: boolean;
   page_permissions: string[];
+  role_assignments?: PlatformAdminRoleAssignmentItem[];
+  permission_overrides?: PlatformAdminPermissionOverrideItem[];
   created_at?: string;
   updated_at?: string;
   last_login_at?: string;
@@ -1916,6 +1955,9 @@ export interface PlatformMyAppAdminPermissions {
   is_super_admin: boolean;
   page_permissions: string[];
   permission_catalog: PlatformPermissionCatalogItem[];
+  role_catalog?: PlatformAdminRoleItem[];
+  role_assignments?: PlatformAdminRoleAssignmentItem[];
+  permission_overrides?: PlatformAdminPermissionOverrideItem[];
   sensitive_actions_super_admin_only?: string[];
 }
 
@@ -4106,6 +4148,8 @@ export const platformApi = {
       display_name?: string;
       admin_type?: 'SUPER_ADMIN' | 'ADMIN';
       page_permissions?: string[];
+      role_keys?: string[];
+      permission_overrides?: string[];
     }
   ) => {
     const response = await apiClient.getClient().post(`/platform-admin/apps/${appId}/admins`, payload);
@@ -4131,7 +4175,9 @@ export const platformApi = {
     appId: string,
     adminUserId: string,
     payload: {
-      page_permissions: string[];
+      page_permissions?: string[];
+      role_keys?: string[];
+      permission_overrides?: string[];
     }
   ) => {
     const response = await apiClient.getClient().patch(

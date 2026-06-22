@@ -30,8 +30,10 @@ import { SmsService } from '../sms/sms.service';
 import { PlatformAppAnalyticsService } from './platform-app-analytics.service';
 import { clearAppSlugAliasCache } from '../../common/middleware/app-slug-alias.middleware';
 import {
+  PLATFORM_APP_ADMIN_ROLE_TEMPLATES,
   PLATFORM_APP_ADMIN_PERMISSION_CATALOG,
   PLATFORM_APP_ADMIN_PERMISSION_KEYS,
+  PlatformAppAdminRoleTemplate,
   findInvalidPlatformAppAdminPermissions,
   normalizePlatformAppAdminPermissions,
 } from '../../common/platform-admin-permissions';
@@ -39,6 +41,37 @@ import {
 type AdminPermissionRow = {
   id: string;
   allowed_pages: unknown;
+};
+
+type AdminRoleRow = {
+  id: string;
+  app_id: string | null;
+  key: string;
+  name: string;
+  description: string | null;
+  is_system: boolean;
+  status: string;
+  permission_keys: unknown;
+  created_at: Date;
+  updated_at: Date;
+};
+
+type AdminRoleAssignmentRow = {
+  role_id: string;
+  role_key: string;
+  role_name: string;
+  is_system: boolean;
+  permission_keys: unknown;
+  created_at: Date;
+};
+
+type AdminPermissionOverrideRow = {
+  permission_key: string;
+  effect: string;
+  reason: string | null;
+  expires_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
 };
 
 type TenantAnalyticsQuery = {
@@ -64,6 +97,7 @@ type TenantAnalyticsQuery = {
 
 const ADMIN_PERMISSION_CATALOG = PLATFORM_APP_ADMIN_PERMISSION_CATALOG;
 const ADMIN_PERMISSION_KEYS = PLATFORM_APP_ADMIN_PERMISSION_KEYS;
+const ADMIN_ROLE_TEMPLATES = PLATFORM_APP_ADMIN_ROLE_TEMPLATES;
 const ALL_ADMIN_PAGE_PERMISSIONS = [...ADMIN_PERMISSION_KEYS].sort();
 const APP_KIND_VALUES = ['DESKTOP', 'WEBSITE', 'MOBILE'] as const;
 type AppKindValue = (typeof APP_KIND_VALUES)[number];
@@ -2678,6 +2712,7 @@ export class PlatformAdminService implements OnModuleInit {
 
   async listAppAdmins(appId: string) {
     const app = await this.ensureAppExists(appId);
+    const roleCatalog = await this.listAdminRolesForApp(appId);
     const users = await this.prisma.user.findMany({
       where: {
         appId,
@@ -2688,22 +2723,24 @@ export class PlatformAdminService implements OnModuleInit {
     const adminUsers = users.filter((user) => this.roleEquals(user.role, 'ADMIN'));
 
     const items = await Promise.all(
-      adminUsers.map(async (user) => ({
-        id: user.id,
-        app_id: user.appId,
-        email: user.email,
-        display_name: user.displayName || user.fullName || user.email,
-        role: this.roleEquals(user.role, 'ADMIN') ? UserRole.ADMIN : user.role,
-        admin_type: this.roleEquals(user.adminType, 'SUPER_ADMIN') ? AdminType.SUPER_ADMIN : AdminType.ADMIN,
-        is_active: user.isActive,
-        page_permissions:
-          this.roleEquals(user.adminType, 'SUPER_ADMIN')
-            ? ALL_ADMIN_PAGE_PERMISSIONS
-            : await this.fetchAdminPermissions(appId, user.id),
-        created_at: user.createdAt,
-        updated_at: user.updatedAt,
-        last_login_at: user.lastLoginAt,
-      })),
+      adminUsers.map(async (user) => {
+        const isSuper = this.roleEquals(user.adminType, 'SUPER_ADMIN');
+        return {
+          id: user.id,
+          app_id: user.appId,
+          email: user.email,
+          display_name: user.displayName || user.fullName || user.email,
+          role: this.roleEquals(user.role, 'ADMIN') ? UserRole.ADMIN : user.role,
+          admin_type: isSuper ? AdminType.SUPER_ADMIN : AdminType.ADMIN,
+          is_active: user.isActive,
+          page_permissions: isSuper ? ALL_ADMIN_PAGE_PERMISSIONS : await this.fetchAdminPermissions(appId, user.id),
+          role_assignments: isSuper ? [] : await this.fetchAdminRoleAssignments(appId, user.id),
+          permission_overrides: isSuper ? [] : await this.fetchAdminPermissionOverrides(appId, user.id),
+          created_at: user.createdAt,
+          updated_at: user.updatedAt,
+          last_login_at: user.lastLoginAt,
+        };
+      }),
     );
 
     return {
@@ -2711,6 +2748,7 @@ export class PlatformAdminService implements OnModuleInit {
       app_slug: app.slug,
       total: items.length,
       permission_catalog: ADMIN_PERMISSION_CATALOG,
+      role_catalog: roleCatalog,
       items,
     };
   }
@@ -2735,16 +2773,11 @@ export class PlatformAdminService implements OnModuleInit {
       is_super_admin: isSuperAdmin,
       page_permissions: pagePermissions,
       permission_catalog: ADMIN_PERMISSION_CATALOG,
+      role_catalog: await this.listAdminRolesForApp(app.id),
+      role_assignments: isSuperAdmin ? [] : await this.fetchAdminRoleAssignments(app.id, user.id),
+      permission_overrides: isSuperAdmin ? [] : await this.fetchAdminPermissionOverrides(app.id, user.id),
       sensitive_actions_super_admin_only: [
-        'admin_accounts',
-        'refund_payment_order',
-        'grant_ai_points',
-        'review_feedback_reward',
-        'create_redeem_codes',
-        'void_redeem_code',
-        'revoke_redeem_redemption',
-        'distribute_redeem_package',
-        'payment_tests',
+        'app.admins.manage',
       ],
     };
   }
@@ -2758,6 +2791,11 @@ export class PlatformAdminService implements OnModuleInit {
     }
 
     const adminType = (payload.admin_type as AdminType) || AdminType.ADMIN;
+    const hasRoleInput = payload.role_keys !== undefined || payload.role_ids !== undefined || payload.roles !== undefined;
+    const hasOverrideInput = payload.permission_overrides !== undefined || payload.extra_permissions !== undefined;
+    const hasPermissionInput = payload.page_permissions !== undefined;
+    const roleKeys = this.normalizeAdminRoleKeys(payload.role_keys ?? payload.role_ids ?? payload.roles);
+    const permissionOverrides = this.normalizeAdminPermissions(payload.permission_overrides ?? payload.extra_permissions ?? []);
     const permissions = this.normalizeAdminPermissions(payload.page_permissions);
 
     let user = await this.prisma.user.findFirst({
@@ -2808,9 +2846,23 @@ export class PlatformAdminService implements OnModuleInit {
         appId,
         user.id,
       );
+      await this.clearAdminRoleBindings(appId, user.id);
     } else {
-      await this.upsertAdminPermissions(appId, user.id, permissions, actorUserId);
+      if (hasRoleInput || hasOverrideInput) {
+        await this.replaceAdminRoleAssignments(appId, user.id, roleKeys, actorUserId);
+        await this.replaceAdminPermissionOverrides(appId, user.id, permissionOverrides, actorUserId);
+      } else if (hasPermissionInput) {
+        await this.clearAdminRoleBindings(appId, user.id);
+        await this.upsertAdminPermissions(appId, user.id, permissions, actorUserId);
+      } else {
+        await this.replaceAdminRoleAssignments(appId, user.id, ['readonly'], actorUserId);
+        await this.replaceAdminPermissionOverrides(appId, user.id, [], actorUserId);
+      }
     }
+
+    const effectivePermissions = adminType === AdminType.SUPER_ADMIN ? ALL_ADMIN_PAGE_PERMISSIONS : await this.fetchAdminPermissions(appId, user.id);
+    const roleAssignments = adminType === AdminType.SUPER_ADMIN ? [] : await this.fetchAdminRoleAssignments(appId, user.id);
+    const overrides = adminType === AdminType.SUPER_ADMIN ? [] : await this.fetchAdminPermissionOverrides(appId, user.id);
 
     return {
       id: user.id,
@@ -2820,7 +2872,9 @@ export class PlatformAdminService implements OnModuleInit {
       role: UserRole.ADMIN,
       admin_type: adminType,
       is_active: user.isActive,
-      page_permissions: adminType === AdminType.SUPER_ADMIN ? ALL_ADMIN_PAGE_PERMISSIONS : permissions,
+      page_permissions: effectivePermissions,
+      role_assignments: roleAssignments,
+      permission_overrides: overrides,
       created_at: user.createdAt,
       updated_at: user.updatedAt,
       last_login_at: user.lastLoginAt,
@@ -2855,7 +2909,12 @@ export class PlatformAdminService implements OnModuleInit {
     };
   }
 
-  async updateAdminPermissions(appId: string, adminUserId: string, pagePermissions: string[], actorUserId: string) {
+  async updateAdminPermissions(
+    appId: string,
+    adminUserId: string,
+    input: string[] | { page_permissions?: string[]; role_keys?: string[]; role_ids?: string[]; roles?: string[]; permission_overrides?: string[]; extra_permissions?: string[] },
+    actorUserId: string,
+  ) {
     const user = await this.findActiveUserInApp(appId, adminUserId);
     if (!user || !this.roleEquals(user.role, 'ADMIN')) {
       throw new NotFoundException('Admin user not found');
@@ -2864,11 +2923,28 @@ export class PlatformAdminService implements OnModuleInit {
       throw new BadRequestException('SUPER_ADMIN always has all permissions');
     }
 
-    const normalized = this.normalizeAdminPermissions(pagePermissions);
-    await this.upsertAdminPermissions(appId, adminUserId, normalized, actorUserId);
+    const payload = Array.isArray(input) ? { page_permissions: input } : input || {};
+    const hasRoleInput = payload.role_keys !== undefined || payload.role_ids !== undefined || payload.roles !== undefined;
+    const hasOverrideInput = payload.permission_overrides !== undefined || payload.extra_permissions !== undefined;
+    if (hasRoleInput || hasOverrideInput) {
+      await this.replaceAdminRoleAssignments(appId, adminUserId, this.normalizeAdminRoleKeys(payload.role_keys ?? payload.role_ids ?? payload.roles), actorUserId);
+      await this.replaceAdminPermissionOverrides(
+        appId,
+        adminUserId,
+        this.normalizeAdminPermissions(payload.permission_overrides ?? payload.extra_permissions ?? []),
+        actorUserId,
+      );
+    } else {
+      await this.clearAdminRoleBindings(appId, adminUserId);
+      await this.upsertAdminPermissions(appId, adminUserId, this.normalizeAdminPermissions(payload.page_permissions || []), actorUserId);
+    }
+
+    const normalized = await this.fetchAdminPermissions(appId, adminUserId);
     return {
       id: user.id,
       page_permissions: normalized,
+      role_assignments: await this.fetchAdminRoleAssignments(appId, adminUserId),
+      permission_overrides: await this.fetchAdminPermissionOverrides(appId, adminUserId),
     };
   }
 
@@ -2905,6 +2981,7 @@ export class PlatformAdminService implements OnModuleInit {
       appId,
       adminUserId,
     );
+    await this.clearAdminRoleBindings(appId, adminUserId);
 
     return { deleted: true };
   }
@@ -4674,10 +4751,244 @@ export class PlatformAdminService implements OnModuleInit {
       throw new BadRequestException(`invalid permission keys: ${invalid.join(', ')}`);
     }
 
-    return normalizePlatformAppAdminPermissions(value);
+    const permissions = normalizePlatformAppAdminPermissions(value);
+    this.assertAssignableAdminPermissions(permissions);
+    return permissions;
+  }
+
+  private assertAssignableAdminPermissions(permissions: string[]) {
+    const restricted = permissions.filter((permission) =>
+      ADMIN_PERMISSION_CATALOG.some((item) => item.key === permission && item.requires_super_admin),
+    );
+    if (restricted.length > 0) {
+      throw new BadRequestException(`permissions require SUPER_ADMIN and cannot be assigned to regular admins: ${restricted.join(', ')}`);
+    }
+  }
+
+  private normalizeAdminRoleKeys(value: unknown): string[] {
+    const raw = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/[,\n]/) : [];
+    return Array.from(
+      new Set(
+        raw
+          .map((item) => String(item || '').trim())
+          .filter(Boolean),
+      ),
+    );
+  }
+
+  private async listAdminRolesForApp(appId: string) {
+    const rows = await (this.prisma.$queryRawUnsafe(
+      `SELECT
+         r.id,
+         r.app_id,
+         r.key,
+         r.name,
+         r.description,
+         r.is_system,
+         r.status,
+         COALESCE(jsonb_agg(rp.permission_key ORDER BY rp.permission_key) FILTER (WHERE rp.permission_key IS NOT NULL), '[]'::jsonb) AS permission_keys,
+         r.created_at,
+         r.updated_at
+       FROM admin_roles r
+       LEFT JOIN admin_role_permissions rp ON rp.role_id = r.id
+       WHERE r.status = 'ACTIVE'
+         AND (r.app_id IS NULL OR r.app_id = $1::uuid)
+       GROUP BY r.id
+       ORDER BY r.is_system DESC, r.name ASC`,
+      appId,
+    ) as Promise<AdminRoleRow[]>);
+
+    if (rows.length > 0) {
+      return rows.map((row) => this.serializeAdminRole(row));
+    }
+
+    return ADMIN_ROLE_TEMPLATES.map((role) => this.serializeAdminRoleTemplate(role));
+  }
+
+  private serializeAdminRole(row: AdminRoleRow) {
+    return {
+      id: row.id,
+      app_id: row.app_id,
+      key: row.key,
+      name: row.name,
+      description: row.description,
+      is_system: row.is_system,
+      status: row.status,
+      permission_keys: normalizePlatformAppAdminPermissions(this.parsePermissionArray(row.permission_keys)),
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    };
+  }
+
+  private serializeAdminRoleTemplate(role: PlatformAppAdminRoleTemplate) {
+    return {
+      id: role.key,
+      app_id: null,
+      key: role.key,
+      name: role.name,
+      description: role.description,
+      is_system: true,
+      status: 'ACTIVE',
+      permission_keys: normalizePlatformAppAdminPermissions(role.permissions),
+      created_at: null,
+      updated_at: null,
+    };
+  }
+
+  private async fetchAdminRoleAssignments(appId: string, adminUserId: string) {
+    const rows = await (this.prisma.$queryRawUnsafe(
+      `SELECT
+         r.id AS role_id,
+         r.key AS role_key,
+         r.name AS role_name,
+         r.is_system,
+         COALESCE(jsonb_agg(rp.permission_key ORDER BY rp.permission_key) FILTER (WHERE rp.permission_key IS NOT NULL), '[]'::jsonb) AS permission_keys,
+         a.created_at
+       FROM admin_user_role_assignments a
+       JOIN admin_roles r ON r.id = a.role_id
+       LEFT JOIN admin_role_permissions rp ON rp.role_id = r.id
+       WHERE a.app_id = $1::uuid
+         AND a.admin_user_id = $2::uuid
+         AND r.status = 'ACTIVE'
+         AND (r.app_id IS NULL OR r.app_id = a.app_id)
+       GROUP BY a.id, r.id
+       ORDER BY r.is_system DESC, r.name ASC`,
+      appId,
+      adminUserId,
+    ) as Promise<AdminRoleAssignmentRow[]>);
+
+    return rows.map((row) => ({
+      role_id: row.role_id,
+      role_key: row.role_key,
+      role_name: row.role_name,
+      is_system: row.is_system,
+      permission_keys: normalizePlatformAppAdminPermissions(this.parsePermissionArray(row.permission_keys)),
+      created_at: row.created_at,
+    }));
+  }
+
+  private async fetchAdminPermissionOverrides(appId: string, adminUserId: string) {
+    const rows = await (this.prisma.$queryRawUnsafe(
+      `SELECT permission_key, effect, reason, expires_at, created_at, updated_at
+       FROM admin_user_permission_overrides
+       WHERE app_id = $1::uuid
+         AND admin_user_id = $2::uuid
+         AND effect = 'ALLOW'
+         AND (expires_at IS NULL OR expires_at > now())
+       ORDER BY created_at DESC`,
+      appId,
+      adminUserId,
+    ) as Promise<AdminPermissionOverrideRow[]>);
+
+    return rows.map((row) => ({
+      permission_key: normalizePlatformAppAdminPermissions([row.permission_key])[0] || row.permission_key,
+      effect: row.effect,
+      reason: row.reason,
+      expires_at: row.expires_at,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }));
+  }
+
+  private async replaceAdminRoleAssignments(appId: string, adminUserId: string, roleKeys: string[], actorUserId: string) {
+    const roles = await this.listAdminRolesForApp(appId);
+    const requested = new Set(roleKeys);
+    const selected = roles.filter((role) => requested.has(role.key) || requested.has(role.id));
+    if (selected.length !== requested.size) {
+      const matched = new Set(selected.flatMap((role) => [role.id, role.key]));
+      const missing = roleKeys.filter((roleKey) => !matched.has(roleKey));
+      throw new BadRequestException(`invalid admin role keys: ${missing.join(', ')}`);
+    }
+
+    await this.prisma.$executeRawUnsafe(
+      `DELETE FROM admin_user_role_assignments WHERE app_id = $1::uuid AND admin_user_id = $2::uuid`,
+      appId,
+      adminUserId,
+    );
+
+    for (const role of selected) {
+      if (!role.id || role.id === role.key) continue;
+      await this.prisma.$executeRawUnsafe(
+        `INSERT INTO admin_user_role_assignments (id, app_id, admin_user_id, role_id, created_by_user_id)
+         VALUES (gen_random_uuid(), $1::uuid, $2::uuid, $3::uuid, $4::uuid)
+         ON CONFLICT (app_id, admin_user_id, role_id) DO NOTHING`,
+        appId,
+        adminUserId,
+        role.id,
+        actorUserId,
+      );
+    }
+  }
+
+  private async replaceAdminPermissionOverrides(appId: string, adminUserId: string, permissionKeys: string[], actorUserId: string) {
+    await this.prisma.$executeRawUnsafe(
+      `DELETE FROM admin_user_permission_overrides WHERE app_id = $1::uuid AND admin_user_id = $2::uuid AND effect = 'ALLOW'`,
+      appId,
+      adminUserId,
+    );
+
+    const normalized = this.normalizeAdminPermissions(permissionKeys);
+    for (const permissionKey of normalized) {
+      await this.prisma.$executeRawUnsafe(
+        `INSERT INTO admin_user_permission_overrides (
+           id, app_id, admin_user_id, permission_key, effect, created_by_user_id, updated_by_user_id
+         )
+         VALUES (gen_random_uuid(), $1::uuid, $2::uuid, $3, 'ALLOW', $4::uuid, $4::uuid)
+         ON CONFLICT (app_id, admin_user_id, permission_key, effect)
+         DO UPDATE SET updated_by_user_id = EXCLUDED.updated_by_user_id, updated_at = now()`,
+        appId,
+        adminUserId,
+        permissionKey,
+        actorUserId,
+      );
+    }
+  }
+
+  private async clearAdminRoleBindings(appId: string, adminUserId: string) {
+    await Promise.all([
+      this.prisma.$executeRawUnsafe(
+        `DELETE FROM admin_user_role_assignments WHERE app_id = $1::uuid AND admin_user_id = $2::uuid`,
+        appId,
+        adminUserId,
+      ),
+      this.prisma.$executeRawUnsafe(
+        `DELETE FROM admin_user_permission_overrides WHERE app_id = $1::uuid AND admin_user_id = $2::uuid`,
+        appId,
+        adminUserId,
+      ),
+    ]);
   }
 
   private async fetchAdminPermissions(appId: string, adminUserId: string): Promise<string[]> {
+    const assignmentRows = await (this.prisma.$queryRawUnsafe(
+      `SELECT id FROM admin_user_role_assignments WHERE app_id = $1::uuid AND admin_user_id = $2::uuid LIMIT 1`,
+      appId,
+      adminUserId,
+    ) as Promise<Array<{ id: string }>>);
+    const roleRows = await (this.prisma.$queryRawUnsafe(
+      `SELECT rp.permission_key
+       FROM admin_user_role_assignments a
+       JOIN admin_roles r ON r.id = a.role_id
+       JOIN admin_role_permissions rp ON rp.role_id = r.id
+       WHERE a.app_id = $1::uuid
+         AND a.admin_user_id = $2::uuid
+         AND r.status = 'ACTIVE'
+         AND (r.app_id IS NULL OR r.app_id = a.app_id)
+       UNION
+       SELECT permission_key
+       FROM admin_user_permission_overrides
+       WHERE app_id = $1::uuid
+         AND admin_user_id = $2::uuid
+         AND effect = 'ALLOW'
+         AND (expires_at IS NULL OR expires_at > now())`,
+      appId,
+      adminUserId,
+    ) as Promise<Array<{ permission_key: string }>>);
+
+    if (assignmentRows.length > 0 || roleRows.length > 0) {
+      return normalizePlatformAppAdminPermissions(roleRows.map((row) => row.permission_key));
+    }
+
     const rows = await (this.prisma.$queryRawUnsafe(
       `SELECT id, allowed_pages FROM admin_page_permissions
        WHERE app_id = $1::uuid AND admin_user_id = $2::uuid LIMIT 1`,

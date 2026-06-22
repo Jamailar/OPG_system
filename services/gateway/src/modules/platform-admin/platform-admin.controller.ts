@@ -14,6 +14,7 @@ import { PlatformObservabilityService } from '../observability/platform-observab
 import { DeveloperAuthorizationService } from '../developer-sdk/developer-authorization.service';
 import { PlatformTasksService } from '../platform-tasks/platform-tasks.service';
 import { PlatformTaskStatus } from '../platform-tasks/platform-tasks.types';
+import { RequireAppAdmin, RequireAppSuperAdmin } from '../../common/decorators/platform-admin-permission.decorator';
 import { AdminNotificationsService } from '../admin-notifications/admin-notifications.service';
 
 @ApiTags('PlatformAdmin')
@@ -51,7 +52,6 @@ export class PlatformAdminController {
   async updateRuntimeSettings(@Req() req: any, @Body() body: any) {
     return this.runtimeSettingsService.updateAdminRuntimeSettings(req.user.id, body || {});
   }
-
 
   @Get('notifications/catalog')
   @ApiOperation({ summary: '管理员通知事件目录' })
@@ -1026,7 +1026,6 @@ export class PlatformAdminController {
     return this.emailDeliveryService.updateAppEmailSettings(appId, body || {});
   }
 
-
   @Get('apps/:app_id/notifications/catalog')
   @ApiOperation({ summary: '租户管理员通知事件目录' })
   async listAppNotificationEventCatalog() {
@@ -1397,12 +1396,14 @@ export class PlatformAdminController {
   }
 
   @Get('apps/:app_id/admins')
+  @RequireAppSuperAdmin()
   @ApiOperation({ summary: '租户管理员列表' })
   async listAppAdmins(@Param('app_id') appId: string) {
     return this.platformAdminService.listAppAdmins(appId);
   }
 
   @Get('apps/:app_id/admin-permissions/me')
+  @RequireAppAdmin()
   @ApiOperation({ summary: '当前租户管理员权限' })
   async getMyAppAdminPermissions(@Req() req: any, @Param('app_id') appId: string) {
     return this.platformAdminService.getMyAppAdminPermissions(appId, req.user.id);
@@ -1433,12 +1434,14 @@ export class PlatformAdminController {
   }
 
   @Post('apps/:app_id/admins')
+  @RequireAppSuperAdmin()
   @ApiOperation({ summary: '创建或更新租户管理员' })
   async createOrUpdateAdmin(@Req() req: any, @Param('app_id') appId: string, @Body() body: any) {
     return this.platformAdminService.createOrUpdateAppAdmin(appId, body, req.user.id);
   }
 
   @Put('apps/:app_id/admins/:admin_user_id/password')
+  @RequireAppSuperAdmin()
   @ApiOperation({ summary: '重置管理员密码' })
   async resetAdminPassword(
     @Param('app_id') appId: string,
@@ -1449,17 +1452,19 @@ export class PlatformAdminController {
   }
 
   @Patch('apps/:app_id/admins/:admin_user_id/permissions')
+  @RequireAppSuperAdmin()
   @ApiOperation({ summary: '更新管理员页面权限' })
   async updateAdminPermissions(
     @Req() req: any,
     @Param('app_id') appId: string,
     @Param('admin_user_id') adminUserId: string,
-    @Body() body: { page_permissions: string[] },
+    @Body() body: { page_permissions?: string[]; role_keys?: string[]; role_ids?: string[]; roles?: string[]; permission_overrides?: string[]; extra_permissions?: string[] },
   ) {
-    return this.platformAdminService.updateAdminPermissions(appId, adminUserId, body.page_permissions || [], req.user.id);
+    return this.platformAdminService.updateAdminPermissions(appId, adminUserId, body || {}, req.user.id);
   }
 
   @Patch('apps/:app_id/admins/:admin_user_id/status')
+  @RequireAppSuperAdmin()
   @ApiOperation({ summary: '更新管理员状态' })
   async updateAdminStatus(
     @Param('app_id') appId: string,
@@ -1470,6 +1475,7 @@ export class PlatformAdminController {
   }
 
   @Delete('apps/:app_id/admins/:admin_user_id')
+  @RequireAppSuperAdmin()
   @ApiOperation({ summary: '删除管理员' })
   async deleteAdmin(@Param('app_id') appId: string, @Param('admin_user_id') adminUserId: string) {
     return this.platformAdminService.deleteAppAdmin(appId, adminUserId);
